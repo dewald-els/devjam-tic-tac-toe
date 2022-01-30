@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import { useStore } from '../store';
 import socket from '../utils/socket';
+import GameOutcome from './GameOutcome.vue';
 
 const store = useStore()
 
@@ -76,15 +77,7 @@ const onPlayAgainClick = () => {
     <p>Player turn: {{ player }}</p>
   </section>
 
-  <section class="gameHasWinner" v-if="winner !== null">
-    <h1>The winner is {{ winner }} in {{ movesPlayed }} moves.</h1>
-    <button @click="onPlayAgainClick">Play again</button>
-  </section>
-
-  <section class="gameHasWinner" v-if="isDraw === true">
-    <h1>Good game! It's a Draw</h1>
-    <button @click="onPlayAgainClick">Play again</button>
-  </section>
+  <GameOutcome />
 </template>
 
 <style scoped>
