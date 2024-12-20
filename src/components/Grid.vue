@@ -35,6 +35,14 @@ socket.on("updatePlayed", (data: any) => {
 })
 
 const onCellClick = (x: number, y: number) => {
+
+
+  if (grid.value[x][y] !== "") {
+    alert("Nice try! But there's already a " + grid.value[x][y] + " in that spot.");
+    return;
+  }
+
+
   const currentPlayer = player.value
 
   if (isLocal.value === false && onlinePlayer.value !== currentPlayer) {
