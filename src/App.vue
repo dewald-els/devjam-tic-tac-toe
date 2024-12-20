@@ -2,7 +2,9 @@
 </script>
 
 <template>
-  <router-view />
+  <main class="bg-gray-800 h-dvh w-dvw">
+    <router-view />
+  </main>
 </template>
 
 <style>

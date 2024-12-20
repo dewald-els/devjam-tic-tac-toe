@@ -71,10 +71,10 @@ const onPlayAgainClick = () => {
 
 <template>
   <section class="gameInProgress">
-    <div class="grid">
+    <div class="grid border border-slate-900">
       <template v-for="(row, rowIdx) in grid">
         <span
-          class="cell"
+          class="cell flex justify-center items-center border-2 border-slate-900 text-3xl font-bold"
           :class="{ winner: (winner === grid[rowIdx][cellIdx]) }"
           v-for="(_, cellIdx) in row"
           @click="onCellClick(rowIdx, cellIdx)"
@@ -99,10 +99,6 @@ const onPlayAgainClick = () => {
 .cell {
   width: var(--cell-size);
   height: var(--cell-size);
-  border: 1px solid #474747;
-  display: flex;
-  justify-content: center;
-  align-items: center;
 }
 .cell.winner {
   background-color: lavender;

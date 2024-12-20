@@ -20,23 +20,11 @@ socket.on("opponentLeftRoom", player => {
 
 </script>
 <template>
-    <main>
-        <h1>Tic Tac Toe</h1>
-        <p v-if="isLocal === false">Room ID: {{ roomId }}</p>
-        <Grid />
-    </main>
+    <div class="flex flex-col justify-center items-center p-8 lg:p-16 text-center">
+        <div>
+            <h1>Tic Tac Toe</h1>
+            <p v-if="isLocal === false">Room ID: {{ roomId }}</p>
+            <Grid />
+        </div>
+    </div>
 </template>
-
-<style>
-main {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    max-width: 960px;
-    margin: 0 auto;
-    padding-left: 1rem;
-    padding-right: 1rem;
-    text-align: center;
-}
-</style>
