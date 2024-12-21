@@ -29,7 +29,9 @@ interface ClientToServerEvents {
   leaveRoom: (data: LeaveRoomData) => void
 }
 
-const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io("http://localhost:5000")
+const socketPath = import.meta.env.VITE_APP_IS_LOCAL ? "http://localhost:8080" : "";
+
+const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(socketPath)
 
 socket.on("connect", () => {
   console.log("connected to server")

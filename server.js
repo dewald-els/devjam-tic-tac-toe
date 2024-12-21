@@ -10,7 +10,7 @@ const io = new Server(server, {
     origin: "*",
   },
 })
-const { PORT = 5000 } = process.env
+const { PORT = 8080 } = process.env
 const cors = require("cors")
 
 app.use(cors())
