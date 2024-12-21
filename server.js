@@ -21,8 +21,8 @@ app.use(express.static(join(__dirname, "dist")))
 const MAX_ROOMS = 50
 const rooms = []
 
-const roomById = roomId => rooms.find(room => room.id === roomId)
-const roomIndexById = roomId => rooms.findIndex(room => room.id === roomById)
+const roomById = roomId => rooms.find(room => room.id === roomId);
+const roomIndexById = roomId => rooms.findIndex(room => room.id === roomById(roomId));
 
 app.get("/", (req, res) => {
   return res.status(200).sendFile(join(__dirname, "dist", "index.html"))

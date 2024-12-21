@@ -29,15 +29,16 @@ interface ClientToServerEvents {
   leaveRoom: (data: LeaveRoomData) => void
 }
 
+const socketUrl = import.meta.env.VITE_APP_IS_LOCAL ? "http://127.0.0.1:8080" : "wss://portfolio-devjam-tictactoe.azurewebsites.net" 
 
-const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io("http://127.0.0.1:8080", {
+const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(socketUrl, {
   reconnection: true,
   reconnectionAttempts: Infinity,
   reconnectionDelay: 1000,
   reconnectionDelayMax: 5000,
   randomizationFactor: 0.5,
   transports: ['websocket']
-})
+});
 
 socket.on("connect", () => {
   console.log("connected to server")
