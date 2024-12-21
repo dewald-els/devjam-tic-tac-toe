@@ -6,8 +6,10 @@ const server = http.createServer(app)
 const { join } = require("path")
 const { Server } = require("socket.io")
 const io = new Server(server, {
+  transports: ['websocket'],
   cors: {
     origin: "*",
+    methods: ["GET", "POST"]
   },
 })
 const { PORT = 8080 } = process.env
@@ -72,4 +74,4 @@ io.on("connection", (socket) => {
 
 })
 
-server.listen(PORT, () => console.log(`Server started on port ${PORT}`))
+server.listen(PORT, "0.0.0.0", () => console.log(`Server started on port ${PORT}`))

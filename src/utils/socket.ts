@@ -31,10 +31,21 @@ interface ClientToServerEvents {
 
 const socketPath = import.meta.env.VITE_APP_IS_LOCAL ? "http://localhost:8080" : "";
 
-const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(socketPath)
+const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(socketPath, {
+  reconnection: true,
+  reconnectionAttempts: Infinity,
+  reconnectionDelay: 1000,
+  reconnectionDelayMax: 5000,
+  randomizationFactor: 0.5,
+  transports: ['websocket']
+})
 
 socket.on("connect", () => {
   console.log("connected to server")
-})
+});
+
+socket.on("connect_error", (error) => {
+  console.log("Could not connect to socket server.");
+});
 
 export default socket
