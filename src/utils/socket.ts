@@ -20,6 +20,8 @@ interface ServerToClientEvents {
   opponentLeftRoom: (leftRoom: { player: string, roomId: string }) => void,
   closeRoom: () => void,
   playerTwoJoined: (room: Room) => void;
+  requestedPlayeAgain: (roomId: string) => void;
+  rematchRefused: () => void;
 }
 
 interface ClientToServerEvents {
@@ -28,6 +30,7 @@ interface ClientToServerEvents {
   joinRoom: (roomId: string) => void,
   playAgain: (roomId: string) => void,
   leaveRoom: (data: LeaveRoomData) => void
+  refuseRematch: () => void;
 }
 
 const socketUrl = import.meta.env.VITE_APP_IS_LOCAL ? "http://127.0.0.1:8080" : "wss://portfolio-devjam-tictactoe.azurewebsites.net" 

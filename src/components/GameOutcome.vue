@@ -14,7 +14,8 @@ const roomId = computed(() => store.state.roomId);
 const player = computed(() => store.state.player);
 
 const onPlayAgainClick = () => {
-  store.commit("resetGame");
+  store.commit("restartGame");
+  socket.emit("playAgain", roomId.value);
 };
 
 const onLeaveGameClick = () => {

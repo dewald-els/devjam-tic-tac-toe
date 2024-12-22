@@ -12,6 +12,27 @@ const router = useRouter();
 const roomId = computed(() => store.state.roomId);
 const isLocal = computed(() => store.state.isLocalGame);
 
+socket.on("requestedPlayeAgain", (roomId: string) => {
+  const confirmed = confirm("Player wants a rematch. Accept?");
+
+  if (confirmed) {
+    console.log("rematch accepted");
+    store.commit("restartGame");
+  } else {
+    console.log("rematch refused via alert");
+    store.commit("resetGame");
+    socket.emit("refuseRematch");
+    router.replace("/");
+  }
+});
+
+socket.on("rematchRefused", () => {
+  console.log("socket.rematchRefused");
+  alert("Sorry, your rematch was refused. Ending game");
+  store.commit("resetGame");
+  router.replace("/");
+});
+
 socket.on("opponentLeftRoom", ({ player, roomId }) => {
   console.log("socket.opponentLeftRoom", player, roomId);
   if (store.state.roomId === roomId) {

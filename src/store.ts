@@ -10,7 +10,7 @@ export interface State {
   player: string;
   gameStarted: boolean;
   winner: string | null;
-  movesPlayed: number;
+movesPlayed: number;
   currentPlayer: string;
   grid: string[][];
   isDraw: boolean;
@@ -71,6 +71,14 @@ export default createStore<State>({
       state.isLocalGame = false;
       state.isDraw = false;
     },
+    restartGame: (state: State) => {
+      state.movesPlayed = 0;
+      state.winner = null;
+      state.grid = setEmptyGrid();
+      state.gameStarted = true;
+      state.isDraw = false;
+      state.currentPlayer = "X";
+    }
   },
 })
 

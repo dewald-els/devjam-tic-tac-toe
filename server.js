@@ -79,6 +79,15 @@ io.on("connection", (socket) => {
     socket.broadcast.emit("updatePlayed", data);
   });
 
+  socket.on("playAgain", (roomId) => {
+    socket.broadcast.emit("requestedPlayeAgain", roomId);
+  });
+
+  socket.on("refuseRematch", () => {
+    console.log("refused rematch");
+    socket.broadcast.emit("rematchRefused");
+  });
+
   socket.on("leaveRoom", ({ roomId, player }) => {
     console.log("Someone leaving room: ", roomId, player);
     const index = roomIndexById(roomId);
