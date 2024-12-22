@@ -10,7 +10,6 @@ const player = computed(() => store.state.player);
 const currentPlayer = computed(() => store.state.currentPlayer);
 const roomId = computed(() => store.state.roomId);
 const winner = computed(() => store.state.winner);
-const isDraw = computed(() => store.state.isDraw);
 const grid = computed(() => store.state.grid);
 const isLocal = computed(() => store.state.isLocalGame);
 const gameStarted = computed(() => store.state.gameStarted);
@@ -25,7 +24,7 @@ socket.on("playerTwoJoined", (room) => {
 const updateGrid = (currentPlayer: string, x: number, y: number): void => {
   console.log("updateGrid: ", { currentPlayer, x, y });
 
-  if (!gameStarted.value) {
+  if (!isLocal && !gameStarted.value) {
     return;
   }
 
@@ -43,7 +42,7 @@ const updateGrid = (currentPlayer: string, x: number, y: number): void => {
 const onCellClick = (x: number, y: number) => {
   console.log("Clicked Cell: ", x, y);
 
-  if (!gameStarted.value) {
+  if (!isLocal && !gameStarted.value) {
     return;
   }
 
@@ -104,7 +103,7 @@ socket.on("updatePlayed", (data: any) => {
       </div>
     </section>
 
-    <div v-if="!gameStarted">
+    <div v-if="!isLocal && !gameStarted">
       <div class="mb-4 bg-red-500 rounded-md text-white p-2">
         <span class="block">Waiting for other player to join.</span>
         <span>Share the room ID with your friend.</span>
