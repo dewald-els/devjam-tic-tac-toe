@@ -17,8 +17,9 @@ interface ServerToClientEvents {
   updatePlayed: (data: any) => void,
   createRoomSuccess: (room: Room) => void,
   joinRoomSuccess: (room: Room) => void,
-  opponentLeftRoom: (player: string) => void,
-  closeRoom: () => void
+  opponentLeftRoom: (leftRoom: { player: string, roomId: string }) => void,
+  closeRoom: () => void,
+  playerTwoJoined: (room: Room) => void;
 }
 
 interface ClientToServerEvents {

@@ -1,5 +1,5 @@
 {
-    "semi": false,
-    "singleQuote": false,
-    "bracketSameLine": true
+  "semi": true,
+  "singleQuote": false,
+  "bracketSameLine": true
 }

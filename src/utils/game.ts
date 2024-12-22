@@ -1,6 +1,8 @@
 export function checkForWinner(grid: Array<string[]>): string | null {
   let winner: null | string = null
 
+  console.log("checking for winner...");
+
   const row1 = grid[0].filter(Boolean)
   const row2 = grid[1].filter(Boolean)
   const row3 = grid[2].filter(Boolean)
@@ -79,6 +81,10 @@ export function checkForWinner(grid: Array<string[]>): string | null {
     winner = grid[0][2]
   }
 
+  if (winner !== null) {
+    console.log("Found a winner: " + winner);
+  }
+
   return winner
 }
 
@@ -88,9 +94,10 @@ export function checkForDraw(
   maxMoves: number
 ): boolean {
 
-  console.log(movesPlayed, maxMoves, winner);
+  console.log("checkForDraw: ", {movesPlayed, maxMoves, winner});
   
   if (movesPlayed === maxMoves && winner === null) {
+    console.log("Found a draw");
     return true
   }
 

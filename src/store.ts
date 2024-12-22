@@ -4,25 +4,27 @@ import { checkForDraw, checkForWinner, setEmptyGrid } from "./utils/game"
 
 export interface State {
   // Socket
-  roomId: string
-  isLocalGame: boolean
-  onlinePlayer: string
+  roomId: string;
+  isLocalGame: boolean;
   // Game
-  winner: string | null
-  movesPlayed: number
-  currentPlayer: string
-  grid: string[][]
-  isDraw: boolean
+  player: string;
+  gameStarted: boolean;
+  winner: string | null;
+  movesPlayed: number;
+  currentPlayer: string;
+  grid: string[][];
+  isDraw: boolean;
 }
 
-export const MAX_MOVES = 9
+export const MAX_MOVES = 9;
 
-export const key: InjectionKey<Store<State>> = Symbol()
+export const key: InjectionKey<Store<State>> = Symbol();
 
 export default createStore<State>({
   state: {
+    player: "X",
+    gameStarted: false,
     roomId: "",
-    onlinePlayer: "",
     isLocalGame: true,
     winner: null,
     movesPlayed: 0,
@@ -31,8 +33,11 @@ export default createStore<State>({
     isDraw: false,
   },
   mutations: {
-    setOnlinePlayer: (state: State, player) => {
-      state.onlinePlayer = player
+    setPlayer: (state: State, player) => {
+      state.player = player
+    },
+    setGameStarted: (state: State, started: boolean) => {
+      state.gameStarted = started;
     },
     setRoomId: (state: State, roomId) => {
       state.roomId = roomId
@@ -56,10 +61,15 @@ export default createStore<State>({
       state.grid[x][y] = player
     },
     resetGame: (state: State) => {
+      state.player = "X";
       state.currentPlayer = "X"
       state.movesPlayed = 0
       state.winner = null
       state.grid = setEmptyGrid()
+      state.roomId = "";
+      state.gameStarted = false;
+      state.isLocalGame = false;
+      state.isDraw = false;
     },
   },
 })
