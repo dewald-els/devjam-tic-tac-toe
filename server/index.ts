@@ -17,7 +17,7 @@ const MAX_ROOMS_PER_IP = Number(process.env.MAX_ROOMS_PER_IP ?? 5)
 const RATE_WINDOW_MS = 10_000
 const RATE_MAX_EVENTS = 40
 const ROOM_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789" // no look-alikes (0/O, 1/I)
-const REACTIONS = new Set(["👍", "😂", "😮", "😈", "🎉", "❤️"])
+const REACTIONS = new Set(["😂", "😮", "😈", "🎉", "❤️"])
 
 interface Seat {
   token: string

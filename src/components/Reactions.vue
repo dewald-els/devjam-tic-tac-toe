@@ -2,7 +2,7 @@
 import { useGame } from "../store"
 
 const { state, actions } = useGame()
-const emojis = ["👍", "😂", "😮", "😈", "🎉", "❤️"]
+const emojis = ["😂", "😮", "😈", "🎉", "❤️"]
 </script>
 
 <template>

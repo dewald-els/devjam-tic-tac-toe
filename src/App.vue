@@ -6,7 +6,7 @@ const { state } = useGame()
 </script>
 
 <template>
-  <main class="min-h-dvh flex flex-col items-center justify-center p-4 sm:p-8">
+  <main class="min-h-dvh flex flex-col items-center justify-center p-3 sm:p-8">
     <router-view />
   </main>
   <ToastHost />

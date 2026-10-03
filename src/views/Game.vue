@@ -10,6 +10,7 @@ import { isMuted, setMuted } from "../utils/sound"
 const { state, actions } = useGame()
 
 const muted = ref(isMuted())
+const settingsOpen = ref(false)
 const toggleMute = () => {
   muted.value = !muted.value
   setMuted(muted.value)
@@ -51,35 +52,51 @@ async function copy(text: string, message: string) {
 </script>
 
 <template>
-  <div class="flex flex-col items-center gap-5">
-    <div class="flex items-center gap-3">
-      <h1 class="text-4xl font-bold">
+  <div class="flex flex-col items-center gap-2.5 sm:gap-5">
+    <div class="flex items-center justify-between gap-3 w-full max-w-[22rem] sm:max-w-md">
+      <h1 class="text-2xl sm:text-4xl font-bold">
         <span class="text-coral">X</span> Tic Tac Toe <span class="text-teal">O</span>
       </h1>
-      <button
-        class="w-11 h-11 text-xl rounded-xl border-4 border-ink bg-white shadow-pop-sm"
-        :aria-label="muted ? 'Unmute sounds' : 'Mute sounds'"
-        @click="toggleMute">
-        {{ muted ? "🔇" : "🔊" }}
-      </button>
+      <div class="relative flex items-center gap-2">
+        <button
+          class="w-9 h-9 sm:w-11 sm:h-11 text-lg sm:text-xl rounded-xl border-4 border-ink bg-white shadow-pop-sm"
+          :aria-label="muted ? 'Unmute sounds' : 'Mute sounds'"
+          @click="toggleMute">
+          {{ muted ? "🔇" : "🔊" }}
+        </button>
+        <button
+          class="w-9 h-9 sm:w-11 sm:h-11 text-lg sm:text-xl rounded-xl border-4 border-ink bg-white shadow-pop-sm"
+          aria-label="Settings"
+          :aria-expanded="settingsOpen"
+          @click="settingsOpen = !settingsOpen">
+          ⚙️
+        </button>
+        <div
+          v-if="settingsOpen"
+          class="absolute right-0 top-full mt-2 z-10 card !p-2 flex flex-col gap-2 min-w-[10rem]">
+          <button class="btn btn-ghost !py-2 !px-3 !text-base" @click="actions.leave">
+            {{ state.mode === "online" ? "Leave room" : "Back to menu" }}
+          </button>
+        </div>
+      </div>
     </div>
 
-    <div v-if="state.mode === 'online'" class="card !p-3 flex flex-col items-center gap-2">
-      <div class="leading-tight text-center">
-        <div class="text-xs font-semibold text-ink/60 uppercase tracking-wide">Room code</div>
-        <div class="text-2xl font-bold tracking-[0.25em]">{{ state.code }}</div>
+    <div v-if="state.mode === 'online' && !state.opponentPresent" class="card !py-2 !px-4 sm:!px-5 flex flex-row items-center justify-between gap-5 min-w-[17rem]">
+      <div class="leading-tight text-left">
+        <div class="text-[10px] font-semibold text-ink/60 uppercase tracking-wide">Room code</div>
+        <div class="text-lg font-bold tracking-[0.2em]">{{ state.code }}</div>
       </div>
-      <button class="btn btn-ghost !py-2 !px-3 !text-base" @click="copy(shareUrl, 'Invite link copied!')">
+      <button class="btn bg-green-500 text-white !py-1 !px-3 !text-sm" @click="copy(shareUrl, 'Invite link copied!')">
         Copy link
       </button>
     </div>
     <div v-else-if="state.mode === 'cpu'" class="font-semibold text-ink/70">
       You (X) vs computer · {{ state.cpuLevel === "hard" ? "unbeatable" : "easy" }}
     </div>
-    <div v-else class="font-semibold text-ink/70">Playing locally on one device</div>
+    <div v-else-if="state.mode === 'local'" class="font-semibold text-ink/70">Playing locally on one device</div>
 
     <div
-      class="px-5 py-2 rounded-full border-4 border-ink font-bold text-xl shadow-pop-sm"
+      class="mt-4 mb-3 sm:my-0 px-4 sm:px-5 py-1 sm:py-2 rounded-full border-4 border-ink font-bold text-lg sm:text-xl shadow-pop-sm"
       :class="finished || waiting || (state.mode === 'online' && !state.connected) || state.opponentAway ? 'bg-sun' : turnColor"
       role="status">
       {{ status }}
@@ -98,15 +115,12 @@ async function copy(text: string, message: string) {
       <button class="btn btn-grape mt-3" @click="actions.findNewOpponent">Find a new opponent</button>
     </div>
 
-    <div class="flex flex-wrap justify-center gap-3 items-center min-h-[4.5rem]">
+    <div class="flex flex-wrap justify-center gap-3 items-center sm:min-h-[4.5rem]">
       <button v-if="finished" class="btn" :disabled="iAskedRematch" @click="actions.rematch">
         {{ iAskedRematch ? "Waiting for opponent…" : opponentAskedRematch ? "Accept rematch" : "Play again" }}
       </button>
-      <button class="btn btn-ghost" @click="actions.leave">
-        {{ state.mode === "online" ? "Leave room" : "Back to menu" }}
-      </button>
     </div>
-    <p v-if="opponentAskedRematch" class="font-bold text-grape -mt-3">Your opponent wants a rematch!</p>
+    <p v-if="opponentAskedRematch" class="font-bold text-grape -mt-1 sm:-mt-3">Your opponent wants a rematch!</p>
 
     <Confetti v-if="iWon" :key="state.scores.X + '-' + state.scores.O" />
   </div>

@@ -22,7 +22,7 @@ const label = (i: number) => {
 </script>
 
 <template>
-  <div class="grid grid-cols-3 grid-rows-3 gap-3 sm:gap-4 w-[min(88vw,22rem)] h-[min(88vw,22rem)]" role="group" aria-label="Game board">
+  <div class="grid grid-cols-3 grid-rows-3 gap-2 sm:gap-4 w-[min(88vw,22rem,46dvh)] h-[min(88vw,22rem,46dvh)]" role="group" aria-label="Game board">
     <button
       v-for="(cell, i) in state.game.board"
       :key="i"
