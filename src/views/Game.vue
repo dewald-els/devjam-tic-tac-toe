@@ -63,8 +63,8 @@ async function copy(text: string, message: string) {
       </button>
     </div>
 
-    <div v-if="state.mode === 'online'" class="card !p-3 flex items-center gap-3">
-      <div class="leading-tight">
+    <div v-if="state.mode === 'online'" class="card !p-3 flex flex-col items-center gap-2">
+      <div class="leading-tight text-center">
         <div class="text-xs font-semibold text-ink/60 uppercase tracking-wide">Room code</div>
         <div class="text-2xl font-bold tracking-[0.25em]">{{ state.code }}</div>
       </div>

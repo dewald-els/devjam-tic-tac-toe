@@ -1,12 +1,22 @@
 <script setup lang="ts">
-import { ref } from "vue"
-import { useRoute } from "vue-router"
+import { onMounted, ref } from "vue"
+import { useRoute, useRouter } from "vue-router"
 import { useGame } from "../store"
 
 const { actions } = useGame()
 const route = useRoute()
+const router = useRouter()
 
 const code = ref(typeof route.query.room === "string" ? route.query.room.toUpperCase().slice(0, 4) : "")
+
+// Invite links (/?room=ABCD) join straight away. The query is then removed so a
+// refresh doesn't try to join again; the code stays in the box if it fails.
+onMounted(() => {
+  if (code.value.length === 4) {
+    actions.joinRoom(code.value)
+    router.replace({ path: "/", query: {} })
+  }
+})
 </script>
 
 <template>
