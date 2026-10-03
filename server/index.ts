@@ -1,6 +1,7 @@
+import { appendFileSync, existsSync, mkdirSync, renameSync, statSync } from "fs"
 import express from "express"
 import http from "http"
-import { join } from "path"
+import { dirname, join } from "path"
 import { Server, Socket } from "socket.io"
 import { applyMove, GameState, isFinished, Mark, newGame, other } from "../src/utils/game"
 
@@ -40,8 +41,44 @@ let waiting: Socket | null = null // quick match: one player waiting for an oppo
 const rooms = new Map<string, Room>()
 const roomByToken = new Map<string, string>() // player token -> room code
 
-const log = (event: string, fields: Record<string, unknown> = {}) =>
-  console.log(JSON.stringify({ t: new Date().toISOString(), event, ...fields }))
+const debugOn = process.env.LOG_LEVEL === "debug"
+// Optional log file (set LOG_FILE, e.g. /home/LogFiles/app.log on Azure where /home persists).
+// Rotates to <file>.1 at ~5MB, so at most ~10MB is ever kept.
+const LOG_FILE = process.env.LOG_FILE
+const LOG_MAX_BYTES = 5 * 1024 * 1024
+let logBytes = 0
+if (LOG_FILE) {
+  try {
+    mkdirSync(dirname(LOG_FILE), { recursive: true })
+    logBytes = existsSync(LOG_FILE) ? statSync(LOG_FILE).size : 0
+  } catch (err) {
+    console.error("Could not prepare log file, logging to console only:", err)
+  }
+}
+function writeLogFile(line: string) {
+  if (!LOG_FILE) return
+  try {
+    if (logBytes > LOG_MAX_BYTES) {
+      renameSync(LOG_FILE, LOG_FILE + ".1")
+      logBytes = 0
+    }
+    appendFileSync(LOG_FILE, `${line}\n`)
+    logBytes += line.length + 1
+  } catch {
+    // never let logging take the game down
+  }
+}
+
+const log = (event: string, fields: Record<string, unknown> = {}) => {
+  const line = JSON.stringify({ t: new Date().toISOString(), event, ...fields })
+  console.log(line)
+  writeLogFile(line)
+}
+const debug = (event: string, fields: Record<string, unknown> = {}) => debugOn && log(event, fields)
+
+
+process.on("uncaughtException", (err) => log("uncaught_exception", { error: String(err), stack: err.stack }))
+process.on("unhandledRejection", (err) => log("unhandled_rejection", { error: String(err) }))
 
 const app = express()
 const server = http.createServer(app)
@@ -140,6 +177,14 @@ io.on("connection", (socket) => {
   }
   const token = auth
   const ip = clientIp(socket)
+  const player = token.slice(0, 6) // short id for logs; never log the full token
+  log("connected", { player, ip, sockets: io.engine.clientsCount })
+
+  // Every refused action is logged with why
+  const reject = (message: string, reason: string, extra: Record<string, unknown> = {}) => {
+    log("rejected", { player, reason, ...extra })
+    socket.emit("errorMessage", message)
+  }
 
   // Basic flood protection
   let windowStart = Date.now()
@@ -151,7 +196,10 @@ io.on("connection", (socket) => {
       count = 0
     }
     if (++count > RATE_MAX_EVENTS) {
-      if (count === RATE_MAX_EVENTS + 1) socket.emit("errorMessage", "Slow down a little!")
+      if (count === RATE_MAX_EVENTS + 1) {
+        log("rate_limited", { player, ip })
+        socket.emit("errorMessage", "Slow down a little!")
+      }
       return next(new Error("rate limited"))
     }
     next()
@@ -166,16 +214,16 @@ io.on("connection", (socket) => {
     const mark = markOf(existing, token)
     if (mark) {
       seat(socket, existing, mark)
-      log("resumed", { code: existing.code, mark })
+      log("resumed", { code: existing.code, mark, player })
     }
   } else {
     socket.emit("noGame")
   }
 
   socket.on("quickMatch", () => {
-    if (myRoom()) return void socket.emit("errorMessage", "You're already in a game.")
+    if (myRoom()) return reject("You're already in a game.", "already_in_game", { action: "quickMatch" })
     if (waiting && waiting.id !== socket.id && waiting.connected && !roomByToken.has(waiting.handshake.auth.token)) {
-      if (rooms.size >= MAX_ROOMS) return void socket.emit("errorMessage", "All rooms are busy right now.")
+      if (rooms.size >= MAX_ROOMS) return reject("All rooms are busy right now.", "rooms_full", { action: "quickMatch" })
       const host = waiting
       waiting = null
       const hostToken = host.handshake.auth.token as string
@@ -199,6 +247,7 @@ io.on("connection", (socket) => {
       log("quick_match", { code: room.code })
     } else {
       waiting = socket
+      log("queued", { player })
       socket.emit("queued")
     }
   })
@@ -208,12 +257,12 @@ io.on("connection", (socket) => {
   })
 
   socket.on("createRoom", () => {
-    if (myRoom()) return void socket.emit("errorMessage", "You're already in a game.")
+    if (myRoom()) return reject("You're already in a game.", "already_in_game", { action: "createRoom" })
     if (rooms.size >= MAX_ROOMS) {
-      return void socket.emit("errorMessage", "All rooms are busy right now. Try again in a minute!")
+      return reject("All rooms are busy right now. Try again in a minute!", "rooms_full", { action: "createRoom" })
     }
     if ([...rooms.values()].filter((r) => r.ip === ip).length >= MAX_ROOMS_PER_IP) {
-      return void socket.emit("errorMessage", "Too many open rooms from your network.")
+      return reject("Too many open rooms from your network.", "ip_room_limit", { ip })
     }
     const now = Date.now()
     const room: Room = {
@@ -230,21 +279,21 @@ io.on("connection", (socket) => {
     rooms.set(room.code, room)
     roomByToken.set(token, room.code)
     seat(socket, room, "X")
-    log("room_created", { code: room.code })
+    log("room_created", { code: room.code, player })
   })
 
   socket.on("joinRoom", (raw: unknown) => {
-    if (myRoom()) return void socket.emit("errorMessage", "You're already in a game.")
+    if (myRoom()) return reject("You're already in a game.", "already_in_game", { action: "joinRoom" })
     const code = typeof raw === "string" ? raw.trim().toUpperCase().slice(0, 8) : ""
     const room = rooms.get(code)
-    if (!room) return void socket.emit("errorMessage", `Room "${code}" doesn't exist.`)
-    if (room.seats.X && room.seats.O) return void socket.emit("errorMessage", "That room is already full.")
+    if (!room) return reject(`Room "${code}" doesn't exist.`, "room_not_found", { code })
+    if (room.seats.X && room.seats.O) return reject("That room is already full.", "room_full", { code })
 
     const mark: Mark = room.seats.X ? "O" : "X"
     room.seats[mark] = { token, socketId: null }
     roomByToken.set(token, code)
     seat(socket, room, mark)
-    log("room_joined", { code })
+    log("room_joined", { code, player, mark })
   })
 
   socket.on("move", (index: unknown) => {
@@ -255,10 +304,14 @@ io.on("connection", (socket) => {
     if (!mark || !snap.full || snap.away || mark !== room.game.turn) return
 
     const next = applyMove(room.game, index as number)
-    if (!next) return
+    if (!next) return void debug("move_invalid", { code: room.code, player, index })
+    debug("move", { code: room.code, mark, index })
     room.game = next
     if (next.winner) room.scores[next.winner]++
     else if (next.draw) room.scores.draws++
+    if (isFinished(next)) {
+      log("game_over", { code: room.code, winner: next.winner, draw: next.draw, moves: next.moves, scores: room.scores })
+    }
     broadcast(room)
   })
 
@@ -269,6 +322,7 @@ io.on("connection", (socket) => {
     if (!mark) return
     room.rematch.add(mark)
     if (room.rematch.size === 2) {
+      log("rematch_started", { code: room.code })
       room.starter = other(room.starter)
       room.game = newGame(room.starter)
       room.rematch.clear()
@@ -291,7 +345,8 @@ io.on("connection", (socket) => {
     if (room && mark) vacate(room, mark, "left")
   })
 
-  socket.on("disconnect", () => {
+  socket.on("disconnect", (reason) => {
+    log("disconnected", { player, reason, sockets: io.engine.clientsCount })
     if (waiting?.id === socket.id) waiting = null
     const room = myRoom()
     const mark = room && markOf(room, token)
