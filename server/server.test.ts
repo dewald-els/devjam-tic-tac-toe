@@ -1,0 +1,133 @@
+import { afterAll, beforeAll, expect, test } from "bun:test"
+import { io as connect, Socket } from "socket.io-client"
+
+const PORT = 8123
+let proc: ReturnType<typeof Bun.spawn>
+const clients: Socket[] = []
+
+let n = 0
+const client = async (token = `tok${Date.now()}${++n}xxxx`) => {
+  const s = connect(`http://127.0.0.1:${PORT}`, { transports: ["websocket"], auth: { token }, forceNew: true })
+  clients.push(s)
+  track(s)
+  await new Promise((r, j) => { s.on("connect", () => r(null)); s.on("connect_error", (e) => j(e)) })
+  return s
+}
+// Events are buffered per socket so none are lost between awaits.
+const queues = new WeakMap<Socket, Record<string, any[]>>()
+const waiters = new WeakMap<Socket, Record<string, ((v: any) => void)[]>>()
+const track = (s: Socket) => {
+  const q: Record<string, any[]> = {}, w: Record<string, ((v: any) => void)[]> = {}
+  queues.set(s, q); waiters.set(s, w)
+  s.onAny((ev, v) => {
+    const waiter = w[ev]?.shift()
+    if (waiter) waiter(v)
+    else (q[ev] ??= []).push(v)
+  })
+}
+const next = <T = any>(s: Socket, ev: string) =>
+  new Promise<T>((r) => {
+    const q = queues.get(s)![ev]
+    if (q?.length) return r(q.shift())
+    ;(waiters.get(s)![ev] ??= []).push(r)
+  })
+
+beforeAll(async () => {
+  proc = Bun.spawn(["bun", "server/index.ts"], { env: { ...process.env, PORT: String(PORT), GRACE_MS: "400" }, stdout: "inherit", stderr: "inherit" })
+  for (let i = 0; i < 50; i++) {
+    try { if ((await fetch(`http://127.0.0.1:${PORT}/healthz`)).ok) return } catch {}
+    await Bun.sleep(100)
+  }
+})
+afterAll(() => { clients.forEach((c) => c.close()); proc.kill() })
+
+test("full game flow, turn enforcement, rematch, room isolation, leave", async () => {
+  const a = await client(), b = await client()
+  const aJoined = next(a, "joined")
+  a.emit("createRoom")
+  expect((await aJoined).mark).toBe("X")
+  const { code } = await next(a, "roomState")
+
+  // another room must not receive this room's events
+  const c = await client(), d = await client()
+  let leaked = false
+  c.on("roomState", (s) => { if (s.code === code) leaked = true })
+  d.on("roomState", () => (leaked = true))
+  c.emit("createRoom")
+  await next(c, "roomState")
+
+  b.emit("joinRoom", code.toLowerCase())
+  expect((await next(b, "joined")).mark).toBe("O")
+  expect((await next(a, "roomState")).full).toBe(true)
+
+  b.emit("move", 0) // O moving first is ignored
+  a.emit("move", 0)
+  let s = await next(a, "roomState")
+  expect(s.game.board[0]).toBe("X")
+
+  for (const [who, i] of [[b, 3], [a, 1], [b, 4], [a, 2]] as const) {
+    who.emit("move", i)
+    s = await next(a, "roomState")
+  }
+  expect(s.game.winner).toBe("X")
+  expect(s.scores.X).toBe(1)
+
+  a.emit("rematch"); s = await next(a, "roomState")
+  expect(s.rematch).toEqual(["X"])
+  b.emit("rematch"); s = await next(a, "roomState")
+  expect(s.game.board.every((x: unknown) => x === null)).toBe(true)
+  expect(s.game.turn).toBe("O") // starter alternates
+
+  const left = next(a, "opponentLeft")
+  b.emit("leaveRoom")
+  expect((await left).reason).toBe("left")
+  expect(leaked).toBe(false)
+})
+
+test("joining a missing room reports an error and doesn't crash the server", async () => {
+  const a = await client()
+  const err = next(a, "errorMessage")
+  a.emit("joinRoom", "NOPE")
+  expect(await err).toContain("doesn't exist")
+  a.emit("joinRoom", { evil: true })
+  expect(await next(a, "errorMessage")).toContain("doesn't exist")
+  expect((await fetch(`http://127.0.0.1:${PORT}/healthz`)).ok).toBe(true)
+})
+
+test("full room rejects a third player; disconnect notifies opponent", async () => {
+  const a = await client(), b = await client(), c = await client()
+  a.emit("createRoom"); const { code } = await next(a, "roomState")
+  b.emit("joinRoom", code); await next(b, "joined")
+  const err = next(c, "errorMessage")
+  c.emit("joinRoom", code)
+  expect(await err).toContain("full")
+  const left = next(a, "opponentLeft")
+  b.close()
+  expect((await left).reason).toBe("timeout")
+})
+
+test("a dropped player can resume within the grace period", async () => {
+  const a = await client()
+  const token = `resume${Date.now()}token`
+  const b = await client(token)
+  a.emit("createRoom"); const { code } = await next(a, "roomState")
+  b.emit("joinRoom", code); await next(b, "joined")
+  await next(a, "roomState")
+
+  b.close()
+  expect((await next(a, "roomState")).away).toBe("O")
+
+  const b2 = await client(token) // same identity, new connection
+  expect((await next(b2, "joined")).mark).toBe("O")
+  expect((await next(a, "roomState")).away).toBeNull()
+})
+
+test("a player with no game is told so; reactions are validated", async () => {
+  const a = await client(), b = await client()
+  await next(a, "noGame")
+  a.emit("createRoom"); const { code } = await next(a, "roomState")
+  b.emit("joinRoom", code); await next(b, "joined"); await next(a, "roomState")
+  a.emit("react", "<script>")
+  a.emit("react", "🎉")
+  expect((await next(b, "reaction")).emoji).toBe("🎉")
+})

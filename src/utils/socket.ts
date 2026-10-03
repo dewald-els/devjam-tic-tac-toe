@@ -1,55 +1,58 @@
 import { io, Socket } from "socket.io-client"
+import type { GameState, Mark } from "./game"
 
-interface Room {
-  id: string;
-  players: string[]
-}
-
-interface LeaveRoomData {
-  roomId: string;
-  player: string;
+export interface RoomSnapshot {
+  code: string
+  game: GameState
+  scores: { X: number; O: number; draws: number }
+  full: boolean
+  away: Mark | null
+  rematch: Mark[]
 }
 
 interface ServerToClientEvents {
-  noArg: () => void
-  basicEmit: (a: number, b: string, c: Buffer) => void
-  withAck: (d: string, callback: (e: number) => void) => void
-  updatePlayed: (data: any) => void,
-  createRoomSuccess: (room: Room) => void,
-  joinRoomSuccess: (room: Room) => void,
-  opponentLeftRoom: (leftRoom: { player: string, roomId: string }) => void,
-  closeRoom: () => void,
-  playerTwoJoined: (room: Room) => void;
-  requestedPlayeAgain: (roomId: string) => void;
-  rematchRefused: () => void;
+  roomState: (room: RoomSnapshot) => void
+  joined: (data: { mark: Mark }) => void
+  opponentLeft: (data: { reason: "left" | "timeout" | "expired" }) => void
+  noGame: () => void
+  replaced: () => void
+  reaction: (data: { from: Mark | null; emoji: string }) => void
+  errorMessage: (message: string) => void
 }
 
 interface ClientToServerEvents {
-  played: (data: any) => void,
-  createRoom: () => void,
-  joinRoom: (roomId: string) => void,
-  playAgain: (roomId: string) => void,
-  leaveRoom: (data: LeaveRoomData) => void
-  refuseRematch: () => void;
+  createRoom: () => void
+  joinRoom: (code: string) => void
+  move: (index: number) => void
+  rematch: () => void
+  react: (emoji: string) => void
+  leaveRoom: () => void
 }
 
-const socketUrl = import.meta.env.VITE_APP_IS_LOCAL ? "http://127.0.0.1:8080" : "wss://portfolio-devjam-tictactoe.azurewebsites.net" 
+// Same origin in production (the server also serves the built client).
+// In dev the Vite server runs separately, so point at the game server.
+const url =
+  (import.meta.env.VITE_SOCKET_URL as string | undefined) ?? (import.meta.env.DEV ? "http://localhost:8080" : undefined)
 
-const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(socketUrl, {
-  reconnection: true,
-  reconnectionAttempts: Infinity,
+// A per-tab identity that survives refreshes, so the server can seat us back in our game.
+function playerToken(): string {
+  const fresh = () => Math.random().toString(36).slice(2) + Date.now().toString(36)
+  try {
+    const stored = sessionStorage.getItem("ttt-token")
+    if (stored) return stored
+    const t: string = ((crypto as any).randomUUID?.() ?? fresh()).replace(/-/g, "")
+    sessionStorage.setItem("ttt-token", t)
+    return t
+  } catch {
+    return fresh()
+  }
+}
+
+const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(url as string, {
+  transports: ["websocket"],
+  auth: { token: playerToken() },
   reconnectionDelay: 1000,
   reconnectionDelayMax: 5000,
-  randomizationFactor: 0.5,
-  transports: ['websocket']
-});
-
-socket.on("connect", () => {
-  console.log("connected to server")
-});
-
-socket.on("connect_error", (error) => {
-  console.log("Could not connect to socket server.");
-});
+})
 
 export default socket

@@ -2,12 +2,57 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --cell-size: 100px;
+@layer base {
+  html,
+  body {
+    @apply bg-cream text-ink font-display;
+    font-weight: 500;
+  }
+  body {
+    background-image: radial-gradient(#2d2a4a14 2px, transparent 2px);
+    background-size: 28px 28px;
+  }
 }
 
-body {
-  font-family: "Pangolin", serif;
-  font-weight: 400;
-  font-style: normal;
+@layer components {
+  .card {
+    @apply bg-white border-4 border-ink rounded-3xl shadow-pop p-5;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl border-4 border-ink
+      bg-sun text-ink font-bold text-lg shadow-pop transition-transform select-none;
+  }
+  .btn:hover:not(:disabled) {
+    @apply -translate-y-0.5;
+  }
+  .btn:active:not(:disabled) {
+    transform: translateY(4px);
+    box-shadow: 0 1px 0 0 #2d2a4a;
+  }
+  .btn:disabled {
+    @apply opacity-50 cursor-not-allowed;
+  }
+  .btn-grape {
+    @apply bg-grape text-white;
+  }
+  .btn-ghost {
+    @apply bg-white;
+  }
+  .input {
+    @apply w-full px-4 py-3 rounded-2xl border-4 border-ink bg-cream text-xl font-bold uppercase
+      tracking-[0.3em] text-center placeholder:normal-case placeholder:tracking-normal
+      placeholder:font-medium placeholder:text-ink/40 focus:outline-none focus:ring-4 focus:ring-grape/40;
+  }
+}
+
+:focus-visible {
+  outline: 4px solid #7c5cff;
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

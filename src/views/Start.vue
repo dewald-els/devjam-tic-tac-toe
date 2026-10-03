@@ -1,99 +1,56 @@
 <script setup lang="ts">
-import { ref } from "vue";
-import { useRouter } from "vue-router";
-import { useStore } from "../store";
-import socket from "../utils/socket";
+import { ref } from "vue"
+import { useRoute } from "vue-router"
+import { useGame } from "../store"
 
-const store = useStore();
-const router = useRouter();
+const { actions } = useGame()
+const route = useRoute()
 
-const roomId = ref("");
-
-socket.on("createRoomSuccess", (room) => {
-  store.commit("setRoomId", room.id);
-  router.push("/play");
-});
-
-socket.on("joinRoomSuccess", (room) => {
-  console.log("Joined");
-  store.commit("setRoomId", room.id);
-  store.commit("setGameStarted", true);
-  router.push("/play");
-});
-
-const onLocalClick = () => {
-  store.commit("setIsLocalGame", true);
-  router.push("/play");
-};
-
-const onJoinClick = () => {
-  if (!roomId.value) {
-    alert("Enter a Room ID");
-    return;
-  }
-  store.commit("setPlayer", "O");
-  store.commit("setRoomId", roomId.value);
-  store.commit("setIsLocalGame", false);
-  socket.emit("joinRoom", roomId.value);
-};
-
-const onCreateClick = () => {
-  store.commit("setPlayer", "X");
-  store.commit("setIsLocalGame", false);
-  socket.emit("createRoom");
-};
+const code = ref(typeof route.query.room === "string" ? route.query.room.toUpperCase().slice(0, 4) : "")
 </script>
+
 <template>
-  <div class="inline-flex flex-col justify-center p-8 lg:p-16">
-    <header class="mb-4">
-      <h1 class="text-4xl font-bold text-slate-300">X - Tic tac toe - O</h1>
-      <p class="text-slate-500">Play online or locally</p>
+  <div class="w-full max-w-md flex flex-col gap-6">
+    <header class="text-center">
+      <h1 class="text-5xl sm:text-6xl font-bold leading-tight">
+        <span class="text-coral inline-block -rotate-6">X</span>
+        Tic Tac Toe
+        <span class="text-teal inline-block rotate-6">O</span>
+      </h1>
+      <p class="text-lg text-ink/70 mt-1">Three in a row. Bragging rights forever.</p>
     </header>
 
-    <section class="border border-slate-600 p-4 rounded-md mb-4">
-      <div class="mb-4">
-        <span class="text-2xl text-slate-300">Play a local game</span>
-        <p class="text-slate-500">
-          Don't want to play online? Share a computer and play a local game.
-        </p>
+    <section class="card flex flex-col gap-3">
+      <h2 class="text-2xl font-bold">Play online</h2>
+      <button class="btn" @click="actions.createRoom">Create a room</button>
+      <div class="flex items-center gap-3 text-ink/50 font-semibold">
+        <hr class="flex-1 border-2 border-ink/20" /> or <hr class="flex-1 border-2 border-ink/20" />
       </div>
-      <button
-        @click="onLocalClick"
-        class="bg-green-500 font-bold p-2 rounded-lg border border-green-700">
-        Play local
-      </button>
-    </section>
-
-    <section class="border border-slate-600 p-4 rounded-md mb-4">
-      <div class="mb-4">
-        <span class="text-2xl text-slate-300">Join existing room</span>
-        <p class="text-slate-500">Join an existing room using a Room ID</p>
-      </div>
-      <div>
+      <form class="flex flex-col gap-3" @submit.prevent="actions.joinRoom(code)">
         <input
-          type="text"
+          v-model.trim="code"
+          class="input"
+          maxlength="4"
           placeholder="Enter room code"
-          v-model.trim="roomId"
-          class="border p-2 rounded-tl-md rounded-bl-md" />
-        <button
-          @click="onJoinClick"
-          class="bg-green-500 font-bold p-2 rounded-tr-md rounded-br-md border border-green-700">
-          Join Room
-        </button>
+          autocomplete="off"
+          autocapitalize="characters"
+          aria-label="Room code" />
+        <button class="btn btn-grape" type="submit" :disabled="code.length < 4">Join room</button>
+      </form>
+    </section>
+
+    <section class="card flex flex-col gap-3">
+      <h2 class="text-2xl font-bold">Play the computer</h2>
+      <div class="grid grid-cols-2 gap-3">
+        <button class="btn btn-ghost" @click="actions.startCpu('easy')">Easy</button>
+        <button class="btn btn-grape" @click="actions.startCpu('hard')">Unbeatable</button>
       </div>
     </section>
 
-    <section class="border border-slate-600 p-4 rounded-md mb-4">
-      <div class="mb-4">
-        <span class="text-2xl text-slate-300">Create Room</span>
-        <p class="text-slate-500">Create a new room and get a Room ID</p>
-      </div>
-
-      <button
-        @click="onCreateClick"
-        class="bg-green-500 font-bold p-2 rounded-lg border border-green-700">
-        Create Room
-      </button>
+    <section class="card flex flex-col gap-3">
+      <h2 class="text-2xl font-bold">Same device?</h2>
+      <p class="text-ink/70 -mt-2">Pass the screen back and forth with a friend.</p>
+      <button class="btn btn-ghost" @click="actions.startLocal">Play locally</button>
     </section>
   </div>
 </template>

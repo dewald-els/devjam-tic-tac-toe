@@ -1,11 +1,15 @@
-# Vue 3 + Typescript + Vite
+# Tic Tac Toe
 
-This template should help get you started developing with Vue 3 and Typescript in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+Multiplayer tic tac toe: Vue 3 + Vite + Tailwind client, Bun + Express + Socket.IO server.
 
-## Recommended IDE Setup
+```sh
+bun install
+bun run dev:server   # game server on :8080
+bun run dev          # client on :5173 (talks to localhost:8080)
+bun test             # engine + server integration tests
+bun run build && bun start   # production: server also serves dist/
+```
 
-- [VSCode](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=johnsoncodehk.volar)
-
-## Type Support For `.vue` Imports in TS
-
-Since TypeScript cannot handle type information for `.vue` imports, they are shimmed to be a generic Vue component type by default. In most cases this is fine if you don't really care about component prop types outside of templates. However, if you wish to get actual prop types in `.vue` imports (for example to get props validation when using manual `h(...)` calls), you can enable Volar's `.vue` type support plugin by running `Volar: Switch TS Plugin on/off` from VSCode command palette.
+- The server is authoritative: it validates turns and moves and owns the game state (`server/index.ts`).
+- Game rules live in `src/utils/game.ts` and are shared by the client (local play) and server.
+- Set `VITE_SOCKET_URL` to point the client at a different socket server; `CORS_ORIGIN` restricts the server.
