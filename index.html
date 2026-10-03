@@ -7,15 +7,65 @@
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#FFF4DC" />
-  <meta name="description" content="A playful multiplayer tic tac toe. Share a room code and play with a friend, or play locally." />
+
+  <title>Tic Tac Toe Online – Play Free with Friends</title>
+  <meta name="description" content="Play tic tac toe online for free. Challenge a friend with a room code, get matched with a random opponent, play the computer, or share one screen. No sign-up needed." />
+  <meta name="keywords" content="tic tac toe, tic tac toe online, noughts and crosses, multiplayer tic tac toe, play with friends, free browser game" />
+  <link rel="canonical" href="https://portfolio-devjam-tictactoe.azurewebsites.net/" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Tic Tac Toe" />
+  <meta property="og:title" content="Tic Tac Toe Online – Play Free with Friends" />
+  <meta property="og:description" content="Challenge a friend with a room code, find a random opponent, or play the computer. No sign-up needed." />
+  <meta property="og:url" content="https://portfolio-devjam-tictactoe.azurewebsites.net/" />
+  <meta property="og:image" content="https://portfolio-devjam-tictactoe.azurewebsites.net/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="A tic tac toe board with the words Tic Tac Toe, play free online with a friend" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Tic Tac Toe Online – Play Free with Friends" />
+  <meta name="twitter:description" content="Challenge a friend with a room code, find a random opponent, or play the computer." />
+  <meta name="twitter:image" content="https://portfolio-devjam-tictactoe.azurewebsites.net/og-image.png" />
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "VideoGame",
+    "name": "Tic Tac Toe",
+    "description": "A playful multiplayer tic tac toe game. Play online with a friend, get matched with a random opponent, play the computer, or share one screen.",
+    "url": "https://portfolio-devjam-tictactoe.azurewebsites.net/",
+    "image": "https://portfolio-devjam-tictactoe.azurewebsites.net/og-image.png",
+    "genre": ["Puzzle", "Strategy"],
+    "applicationCategory": "Game",
+    "operatingSystem": "Any (web browser)",
+    "playMode": ["SinglePlayer", "MultiPlayer"],
+    "numberOfPlayers": "1-2",
+    "inLanguage": "en",
+    "isAccessibleForFree": true,
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+  }
+  </script>
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <title>Tic Tac Toe</title>
 </head>
 
 <body>
-  <div id="app"></div>
+  <div id="app">
+    <!-- Replaced once the app loads; gives crawlers and no-JS visitors real content. -->
+    <main style="max-width:36rem;margin:3rem auto;padding:0 1rem;font-family:system-ui,sans-serif;color:#2D2A4A">
+      <h1>Tic Tac Toe Online</h1>
+      <p>Play tic tac toe for free in your browser. No sign-up needed.</p>
+      <ul>
+        <li>Play with a friend using a 4-letter room code</li>
+        <li>Quick match: get paired with a random opponent</li>
+        <li>Play the computer on easy or unbeatable</li>
+        <li>Share one device and play locally</li>
+      </ul>
+      <noscript><p>This game needs JavaScript. Please enable it to play.</p></noscript>
+    </main>
+  </div>
   <script type="module" src="/src/main.ts"></script>
 </body>
 
