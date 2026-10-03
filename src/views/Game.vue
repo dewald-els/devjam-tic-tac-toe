@@ -24,7 +24,7 @@ const iWon = computed(() => state.game.winner !== null && (state.you === null ||
 const status = computed(() => {
   const g = state.game
   if (state.mode === "online" && !state.connected) return "Reconnecting…"
-  if (waiting.value) return "Waiting for a friend…"
+  if (waiting.value) return state.hadOpponent ? "Opponent left the game" : "Waiting for a friend…"
   if (state.opponentAway) return "Opponent reconnecting…"
   if (g.draw) return "It's a draw! 🤝"
   if (g.winner) {
@@ -88,6 +88,14 @@ async function copy(text: string, message: string) {
     <Scoreboard />
 
     <Reactions v-if="state.mode === 'online' && state.opponentPresent" />
+
+    <div v-if="waiting && state.hadOpponent" class="card !p-3 text-center max-w-xs">
+      <p class="font-semibold">
+        Your opponent left before the game started. Share the code
+        <b class="tracking-widest">{{ state.code }}</b> with someone else, or find a new opponent.
+      </p>
+      <button class="btn btn-grape mt-3" @click="actions.findNewOpponent">Find a new opponent</button>
+    </div>
 
     <div class="flex flex-wrap justify-center gap-3 items-center min-h-[4.5rem]">
       <button v-if="finished" class="btn" :disabled="iAskedRematch" @click="actions.rematch">

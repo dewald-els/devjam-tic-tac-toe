@@ -12,7 +12,7 @@ const {
   WAITING_MS = String(10 * 60_000), // room with nobody joined
 } = process.env
 const MAX_ROOMS = 200
-const MAX_ROOMS_PER_IP = 5
+const MAX_ROOMS_PER_IP = Number(process.env.MAX_ROOMS_PER_IP ?? 5)
 const RATE_WINDOW_MS = 10_000
 const RATE_MAX_EVENTS = 40
 const ROOM_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789" // no look-alikes (0/O, 1/I)
@@ -36,6 +36,7 @@ interface Room {
   lastActive: number
 }
 
+let waiting: Socket | null = null // quick match: one player waiting for an opponent
 const rooms = new Map<string, Room>()
 const roomByToken = new Map<string, string>() // player token -> room code
 
@@ -98,7 +99,25 @@ function destroy(room: Room, reason: "left" | "timeout" | "expired", exceptSocke
   log("room_closed", { code: room.code, reason })
 }
 
-function seat(socket: Socket, room: Room, mark: Mark) {
+/**
+ * A player is gone for good. Before the first move the room stays open for someone else to take the
+ * seat; once the game has started it ends, so a stranger can never inherit a half-played game.
+ */
+function vacate(room: Room, mark: Mark, reason: "left" | "timeout") {
+  const s = room.seats[mark]
+  if (!s) return
+  if (room.game.moves > 0) return destroy(room, reason, s.socketId ? io.sockets.sockets.get(s.socketId) : undefined)
+  clearTimeout(s.timer)
+  roomByToken.delete(s.token)
+  if (s.socketId) io.sockets.sockets.get(s.socketId)?.leave(room.code)
+  delete room.seats[mark]
+  room.rematch.clear()
+  log("seat_vacated", { code: room.code, mark, reason })
+  if (!room.seats.X && !room.seats.O) return destroy(room, "left")
+  broadcast(room)
+}
+
+function seat(socket: Socket, room: Room, mark: Mark, announce = true) {
   const s = room.seats[mark]!
   clearTimeout(s.timer)
   if (s.socketId && s.socketId !== socket.id) {
@@ -110,7 +129,7 @@ function seat(socket: Socket, room: Room, mark: Mark) {
   s.socketId = socket.id
   socket.join(room.code)
   socket.emit("joined", { mark })
-  broadcast(room)
+  if (announce) broadcast(room)
 }
 
 io.on("connection", (socket) => {
@@ -153,6 +172,41 @@ io.on("connection", (socket) => {
     socket.emit("noGame")
   }
 
+  socket.on("quickMatch", () => {
+    if (myRoom()) return void socket.emit("errorMessage", "You're already in a game.")
+    if (waiting && waiting.id !== socket.id && waiting.connected && !roomByToken.has(waiting.handshake.auth.token)) {
+      if (rooms.size >= MAX_ROOMS) return void socket.emit("errorMessage", "All rooms are busy right now.")
+      const host = waiting
+      waiting = null
+      const hostToken = host.handshake.auth.token as string
+      const now = Date.now()
+      const room: Room = {
+        code: makeCode(),
+        seats: { X: { token: hostToken, socketId: null }, O: { token, socketId: null } },
+        game: newGame("X"),
+        starter: "X",
+        scores: { X: 0, O: 0, draws: 0 },
+        rematch: new Set(),
+        ip,
+        createdAt: now,
+        lastActive: now,
+      }
+      rooms.set(room.code, room)
+      roomByToken.set(hostToken, room.code)
+      roomByToken.set(token, room.code)
+      seat(host, room, "X", false) // one broadcast once both are seated, so nobody briefly looks "away"
+      seat(socket, room, "O")
+      log("quick_match", { code: room.code })
+    } else {
+      waiting = socket
+      socket.emit("queued")
+    }
+  })
+
+  socket.on("cancelQueue", () => {
+    if (waiting?.id === socket.id) waiting = null
+  })
+
   socket.on("createRoom", () => {
     if (myRoom()) return void socket.emit("errorMessage", "You're already in a game.")
     if (rooms.size >= MAX_ROOMS) {
@@ -186,9 +240,10 @@ io.on("connection", (socket) => {
     if (!room) return void socket.emit("errorMessage", `Room "${code}" doesn't exist.`)
     if (room.seats.X && room.seats.O) return void socket.emit("errorMessage", "That room is already full.")
 
-    room.seats.O = { token, socketId: null }
+    const mark: Mark = room.seats.X ? "O" : "X"
+    room.seats[mark] = { token, socketId: null }
     roomByToken.set(token, code)
-    seat(socket, room, "O")
+    seat(socket, room, mark)
     log("room_joined", { code })
   })
 
@@ -232,18 +287,19 @@ io.on("connection", (socket) => {
 
   socket.on("leaveRoom", () => {
     const room = myRoom()
-    if (room) destroy(room, "left", socket)
-    socket.leave(room?.code ?? "")
+    const mark = room && markOf(room, token)
+    if (room && mark) vacate(room, mark, "left")
   })
 
   socket.on("disconnect", () => {
+    if (waiting?.id === socket.id) waiting = null
     const room = myRoom()
     const mark = room && markOf(room, token)
     if (!room || !mark) return
     const s = room.seats[mark]!
     if (s.socketId !== socket.id) return // replaced by a newer connection
     s.socketId = null
-    s.timer = setTimeout(() => destroy(room, "timeout"), Number(GRACE_MS))
+    s.timer = setTimeout(() => vacate(room, mark, "timeout"), Number(GRACE_MS))
     broadcast(room)
     log("player_away", { code: room.code, mark })
   })

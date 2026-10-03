@@ -21,11 +21,13 @@ export type CpuLevel = "easy" | "hard"
 interface State {
   mode: "menu" | "local" | "cpu" | "online"
   connected: boolean
+  queued: boolean
   code: string
   you: Mark | null
   cpuLevel: CpuLevel
   opponentPresent: boolean
   opponentAway: boolean
+  hadOpponent: boolean
   game: GameState
   scores: { X: number; O: number; draws: number }
   rematch: Mark[]
@@ -37,11 +39,13 @@ interface State {
 const state = reactive<State>({
   mode: "menu",
   connected: socket.connected,
+  queued: false,
   code: "",
   you: null,
   cpuLevel: "hard",
   opponentPresent: false,
   opponentAway: false,
+  hadOpponent: false,
   game: newGame(),
   scores: { X: 0, O: 0, draws: 0 },
   rematch: [],
@@ -103,6 +107,7 @@ function reset() {
   state.you = null
   state.opponentPresent = false
   state.opponentAway = false
+  state.hadOpponent = false
   state.game = newGame()
   state.scores = { X: 0, O: 0, draws: 0 }
   state.rematch = []
@@ -116,6 +121,7 @@ function applyRoom(room: RoomSnapshot) {
   state.game = room.game
   state.scores = room.scores
   state.opponentPresent = room.full
+  if (room.full) state.hadOpponent = true
   state.opponentAway = room.away !== null && room.away !== state.you
   state.rematch = room.rematch
 }
@@ -129,9 +135,15 @@ socket.on("connect", () => {
 // grace period and re-seats us (or tells us it's gone) when we reconnect.
 socket.on("disconnect", () => {
   state.connected = false
+  state.queued = false
+})
+
+socket.on("queued", () => {
+  state.queued = true
 })
 
 socket.on("joined", ({ mark }) => {
+  state.queued = false
   state.mode = "online"
   state.you = mark
   if (router.currentRoute.value.path !== "/play") router.push("/play")
@@ -140,7 +152,12 @@ socket.on("joined", ({ mark }) => {
 socket.on("roomState", (room) => {
   const wasWaiting = state.mode === "online" && !state.opponentPresent
   const wasAway = state.opponentAway
+  const wasFull = state.opponentPresent
   applyRoom(room)
+  if (state.mode === "online" && wasFull && !room.full) {
+    toast("Your opponent left. Share the code or find a new opponent.")
+    return
+  }
   if (wasWaiting && room.full && state.you === "X") toast("Your friend joined. Let's play!")
   if (state.opponentAway && !wasAway) toast("Your opponent lost connection. Waiting for them…")
   else if (wasAway && !state.opponentAway) toast("Your opponent is back!")
@@ -195,6 +212,15 @@ export const actions = {
     router.push("/play")
   },
 
+  quickMatch() {
+    socket.emit("quickMatch")
+  },
+
+  cancelQueue() {
+    state.queued = false
+    socket.emit("cancelQueue")
+  },
+
   createRoom() {
     socket.emit("createRoom")
   },
@@ -224,6 +250,14 @@ export const actions = {
 
   react(emoji: string) {
     if (state.mode === "online") socket.emit("react", emoji)
+  },
+
+  /** Drop this room (the game is saved for others to continue) and queue for a new opponent. */
+  findNewOpponent() {
+    socket.emit("leaveRoom")
+    reset()
+    router.replace("/")
+    socket.emit("quickMatch")
   },
 
   leave() {

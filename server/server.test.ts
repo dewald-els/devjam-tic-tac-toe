@@ -33,7 +33,7 @@ const next = <T = any>(s: Socket, ev: string) =>
   })
 
 beforeAll(async () => {
-  proc = Bun.spawn(["bun", "server/index.ts"], { env: { ...process.env, PORT: String(PORT), GRACE_MS: "400" }, stdout: "inherit", stderr: "inherit" })
+  proc = Bun.spawn(["bun", "server/index.ts"], { env: { ...process.env, PORT: String(PORT), GRACE_MS: "400", MAX_ROOMS_PER_IP: "1000" }, stdout: "inherit", stderr: "inherit" })
   for (let i = 0; i < 50; i++) {
     try { if ((await fetch(`http://127.0.0.1:${PORT}/healthz`)).ok) return } catch {}
     await Bun.sleep(100)
@@ -78,9 +78,15 @@ test("full game flow, turn enforcement, rematch, room isolation, leave", async (
   expect(s.game.board.every((x: unknown) => x === null)).toBe(true)
   expect(s.game.turn).toBe("O") // starter alternates
 
-  const left = next(a, "opponentLeft")
   b.emit("leaveRoom")
-  expect((await left).reason).toBe("left")
+  const afterLeave = await next(a, "roomState")
+  expect(afterLeave.full).toBe(false)
+  expect(afterLeave.game.turn).toBe("O") // game is kept
+
+  // a newcomer takes the free seat and continues
+  const e = await client()
+  e.emit("joinRoom", code)
+  expect((await next(e, "joined")).mark).toBe("O")
   expect(leaked).toBe(false)
 })
 
@@ -97,13 +103,15 @@ test("joining a missing room reports an error and doesn't crash the server", asy
 test("full room rejects a third player; disconnect notifies opponent", async () => {
   const a = await client(), b = await client(), c = await client()
   a.emit("createRoom"); const { code } = await next(a, "roomState")
-  b.emit("joinRoom", code); await next(b, "joined")
+  b.emit("joinRoom", code); await next(b, "joined"); await next(a, "roomState")
   const err = next(c, "errorMessage")
   c.emit("joinRoom", code)
   expect(await err).toContain("full")
-  const left = next(a, "opponentLeft")
   b.close()
-  expect((await left).reason).toBe("timeout")
+  expect((await next(a, "roomState")).away).toBe("O")
+  const after = await next(a, "roomState") // grace expires: seat freed, room survives
+  expect(after.full).toBe(false)
+  expect(after.away).toBeNull()
 })
 
 test("a dropped player can resume within the grace period", async () => {
@@ -130,4 +138,40 @@ test("a player with no game is told so; reactions are validated", async () => {
   a.emit("react", "<script>")
   a.emit("react", "🎉")
   expect((await next(b, "reaction")).emoji).toBe("🎉")
+})
+
+test("quick match pairs two waiting players, and a cancelled search is skipped", async () => {
+  const a = await client(), b = await client(), c = await client()
+  a.emit("quickMatch")
+  await next(a, "queued")
+  a.emit("cancelQueue")
+  b.emit("quickMatch")
+  await next(b, "queued") // a cancelled, so b waits instead of pairing
+  c.emit("quickMatch")
+  expect((await next(b, "joined")).mark).toBe("X")
+  expect((await next(c, "joined")).mark).toBe("O")
+  expect((await next(c, "roomState")).full).toBe(true)
+
+  // someone already in a game can't queue
+  const err = next(c, "errorMessage")
+  c.emit("quickMatch")
+  expect(await err).toContain("already")
+})
+
+test("leaving mid-game ends it; leaving before the first move keeps the room open", async () => {
+  const a = await client(), b = await client()
+  a.emit("createRoom"); const { code } = await next(a, "roomState")
+  b.emit("joinRoom", code); await next(b, "joined"); await next(a, "roomState")
+
+  b.emit("leaveRoom") // no moves yet: seat freed
+  expect((await next(a, "roomState")).full).toBe(false)
+
+  const c = await client()
+  c.emit("joinRoom", code); await next(c, "joined"); await next(a, "roomState")
+  a.emit("move", 0); await next(a, "roomState")
+  c.emit("leaveRoom") // game started: it ends
+  expect((await next(a, "opponentLeft")).reason).toBe("left")
+  const d = await client()
+  d.emit("joinRoom", code)
+  expect(await next(d, "errorMessage")).toContain("doesn't exist")
 })

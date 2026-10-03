@@ -3,7 +3,7 @@ import { onMounted, ref } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { useGame } from "../store"
 
-const { actions } = useGame()
+const { state, actions } = useGame()
 const route = useRoute()
 const router = useRouter()
 
@@ -31,7 +31,17 @@ onMounted(() => {
     </header>
 
     <section class="card flex flex-col gap-3">
-      <h2 class="text-2xl font-bold">Play online</h2>
+      <h2 class="text-2xl font-bold">Quick match</h2>
+      <p class="text-ink/70 -mt-2">Get paired with another player who's looking for a game.</p>
+      <button v-if="!state.queued" class="btn btn-grape" @click="actions.quickMatch">Find an opponent</button>
+      <div v-else class="flex flex-col gap-3 items-center">
+        <p class="font-bold animate-pulse" role="status">Searching for an opponent…</p>
+        <button class="btn btn-ghost" @click="actions.cancelQueue">Cancel</button>
+      </div>
+    </section>
+
+    <section class="card flex flex-col gap-3">
+      <h2 class="text-2xl font-bold">Play with a friend</h2>
       <button class="btn" @click="actions.createRoom">Create a room</button>
       <div class="flex items-center gap-3 text-ink/50 font-semibold">
         <hr class="flex-1 border-2 border-ink/20" /> or <hr class="flex-1 border-2 border-ink/20" />

@@ -15,6 +15,7 @@ interface ServerToClientEvents {
   joined: (data: { mark: Mark }) => void
   opponentLeft: (data: { reason: "left" | "timeout" | "expired" }) => void
   noGame: () => void
+  queued: () => void
   replaced: () => void
   reaction: (data: { from: Mark | null; emoji: string }) => void
   errorMessage: (message: string) => void
@@ -22,6 +23,8 @@ interface ServerToClientEvents {
 
 interface ClientToServerEvents {
   createRoom: () => void
+  quickMatch: () => void
+  cancelQueue: () => void
   joinRoom: (code: string) => void
   move: (index: number) => void
   rematch: () => void
