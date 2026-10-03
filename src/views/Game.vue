@@ -37,7 +37,8 @@ const status = computed(() => {
 })
 
 const turnColor = computed(() => (state.game.turn === "X" ? "bg-coral text-white" : "bg-teal text-ink"))
-const shareUrl = computed(() => `${location.origin}/?room=${state.code}`)
+const inviteBase = (import.meta.env.VITE_INVITE_BASE as string | undefined) ?? location.origin
+const shareUrl = computed(() => `${inviteBase}/?room=${state.code}`)
 
 async function copy(text: string, message: string) {
   try {

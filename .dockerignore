@@ -4,3 +4,5 @@ dist
 .github
 *.log
 .env
+dist-itch
+itch.zip

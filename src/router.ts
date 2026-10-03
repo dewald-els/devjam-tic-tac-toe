@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory, RouteRecordRaw } from "vue-router"
+import { createRouter, createWebHashHistory, createWebHistory, RouteRecordRaw } from "vue-router"
 
 const routes: RouteRecordRaw[] = [
   { path: "/", component: () => import("./views/Start.vue") },
@@ -7,6 +7,6 @@ const routes: RouteRecordRaw[] = [
 ]
 
 export default createRouter({
-  history: createWebHistory(),
+  history: import.meta.env.VITE_ROUTER_HASH ? createWebHashHistory() : createWebHistory(),
   routes,
 })
