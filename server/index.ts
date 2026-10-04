@@ -366,6 +366,15 @@ io.on("connection", (socket) => {
     broadcast(room)
   })
 
+  on("declineRematch", () => {
+    const room = myRoom()
+    const mark = room && markOf(room, token)
+    if (!room || !mark || !room.rematch.has(other(mark))) return
+    log("rematch_declined", { code: room.code, by: mark })
+    socket.to(room.code).emit("rematchDeclined") // lands before the opponentLeft that vacate() sends
+    vacate(room, mark, "left")
+  })
+
   let lastReaction = 0
   on("react", (emoji: unknown) => {
     const room = myRoom()

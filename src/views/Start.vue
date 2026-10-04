@@ -10,7 +10,7 @@ const router = useRouter()
 
 const variant = ref<Variant>("classic")
 const vanishing = computed(() => variant.value === "vanishing")
-const screen = ref<"home" | "online" | "cpu">("home")
+const screen = ref<"home" | "online" | "cpu">(route.query.room ? "online" : "home")
 const code = ref(typeof route.query.room === "string" ? route.query.room.toUpperCase().slice(0, 4) : "")
 
 // Invite links (/?room=ABCD) join straight away. The query is then removed so a

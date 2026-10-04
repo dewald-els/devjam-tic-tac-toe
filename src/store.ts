@@ -31,6 +31,7 @@ interface State {
   game: GameState
   scores: { X: number; O: number; draws: number }
   rematch: Mark[]
+  rematchDeclined: boolean
   starter: Mark
   toasts: Toast[]
   reactions: FloatingReaction[]
@@ -49,6 +50,7 @@ const state = reactive<State>({
   game: newGame(),
   scores: { X: 0, O: 0, draws: 0 },
   rematch: [],
+  rematchDeclined: false,
   starter: "X",
   toasts: [],
   reactions: [],
@@ -111,6 +113,7 @@ function reset() {
   state.game = newGame()
   state.scores = { X: 0, O: 0, draws: 0 }
   state.rematch = []
+  state.rematchDeclined = false
   state.starter = "X"
   state.reactions = []
 }
@@ -203,9 +206,14 @@ const leftMessages = {
   expired: "The room expired from inactivity.",
 }
 socket.on("opponentLeft", ({ reason }) => {
+  if (state.rematchDeclined) return // keep the "declined" popup; its Okay button takes them home
   reset()
   router.replace("/")
   toast(leftMessages[reason] ?? leftMessages.left)
+})
+
+socket.on("rematchDeclined", () => {
+  state.rematchDeclined = true
 })
 
 socket.on("reaction", ({ from, emoji }) => {
@@ -286,6 +294,18 @@ export const actions = {
     state.starter = other(state.starter)
     state.game = newGame(state.starter, state.game.variant)
     maybeCpuTurn()
+  },
+
+  /** Tell the requester, then go home: the server ends the room. */
+  declineRematch() {
+    if (state.mode !== "online") return
+    socket.emit("declineRematch")
+    reset()
+    router.replace("/")
+  },
+
+  dismissDeclined() {
+    state.rematchDeclined = false
   },
 
   react(emoji: string) {

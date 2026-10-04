@@ -18,6 +18,7 @@ interface ServerToClientEvents {
   queued: () => void
   replaced: () => void
   reaction: (data: { from: Mark | null; emoji: string }) => void
+  rematchDeclined: () => void
   errorMessage: (message: string) => void
 }
 
@@ -28,6 +29,7 @@ interface ClientToServerEvents {
   joinRoom: (code: string) => void
   move: (index: number) => void
   rematch: () => void
+  declineRematch: () => void
   react: (emoji: string) => void
   leaveRoom: () => void
   sync: (ack: (room: RoomSnapshot | null) => void) => void

@@ -189,9 +189,22 @@ async function copy(text: string, message: string) {
         <p class="text-xl font-bold">Rematch? 🔁</p>
         <p class="font-semibold text-ink/70 mt-1">Your opponent wants to play again.</p>
         <div class="flex justify-center gap-3 mt-4">
-          <button class="btn btn-ghost !py-2 !px-4 !text-base" @click="rematchDismissed = true">Not now</button>
+          <button class="btn btn-ghost !py-2 !px-4 !text-base" @click="actions.declineRematch">Not now</button>
           <button class="btn !py-2 !px-4 !text-base" @click="actions.rematch">Accept</button>
         </div>
+      </div>
+    </div>
+
+    <div
+      v-if="state.rematchDeclined"
+      class="fixed inset-0 z-20 flex items-center justify-center bg-ink/50 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Rematch declined">
+      <div class="card !p-5 text-center max-w-xs">
+        <p class="text-xl font-bold">Rematch declined 😕</p>
+        <p class="font-semibold text-ink/70 mt-1">Your opponent doesn't want to play again.</p>
+        <button class="btn mt-4 !py-2 !px-4 !text-base" @click="actions.leave">Okay</button>
       </div>
     </div>
 
