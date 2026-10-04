@@ -19,6 +19,7 @@ const toggleMute = () => {
 
 const finished = computed(() => state.game.winner !== null || state.game.draw)
 const waiting = computed(() => state.mode === "online" && !state.opponentPresent)
+const classicRoom = computed(() => state.game.variant === "classic")
 const iAskedRematch = computed(() => !!state.you && state.rematch.includes(state.you))
 const opponentAskedRematch = computed(() => state.rematch.length > 0 && !iAskedRematch.value)
 const rematchDismissed = ref(false)
@@ -173,9 +174,10 @@ async function copy(text: string, message: string) {
     <div v-if="waiting && state.hadOpponent" class="card !p-3 text-center max-w-xs">
       <p class="font-semibold">
         Your opponent left before the game started. Share the code
-        <b class="tracking-widest">{{ state.code }}</b> with someone else, or find a new opponent.
+        <b class="tracking-widest">{{ state.code }}</b> with someone else<template v-if="classicRoom">, or find a new opponent</template>.
       </p>
-      <button class="btn btn-grape mt-3" @click="actions.findNewOpponent">Find a new opponent</button>
+      <!-- Quick match is Classic only, so it would silently change the game mode -->
+      <button v-if="classicRoom" class="btn btn-grape mt-3" @click="actions.findNewOpponent">Find a new opponent</button>
     </div>
 
     <div class="flex flex-wrap justify-center gap-3 items-center sm:min-h-[4.5rem]">

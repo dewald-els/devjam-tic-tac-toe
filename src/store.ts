@@ -81,7 +81,8 @@ function reaction(emoji: string, from: Mark | null) {
 function announce(prev: GameState, next: GameState) {
   if (next.moves > prev.moves) sfx("place")
   // Sabotage: tell both players what the claimed tile hid (only for a single live move, not a resync)
-  if (next.variant === "sabotage" && next.moves === prev.moves + 1) {
+  // (prev.variant check: when we first join, `prev` is just the placeholder game, so there's nothing to compare)
+  if (next.variant === "sabotage" && prev.variant === "sabotage" && next.moves === prev.moves + 1) {
     const found = Object.keys(next.revealed).find((k) => !(Number(k) in prev.revealed))
     if (found !== undefined) {
       const e = EFFECTS[next.revealed[Number(found)]]
@@ -92,7 +93,7 @@ function announce(prev: GameState, next: GameState) {
     }
   }
   // Sabotage: a power-up left someone's hand without a move being made (and it isn't a rematch reset)
-  if (next.variant === "sabotage" && next.moves === prev.moves) {
+  if (next.variant === "sabotage" && prev.variant === "sabotage" && next.moves === prev.moves) {
     for (const m of ["X", "O"] as Mark[]) {
       const used = prev.hands[m].find((e, i) => next.hands[m][i] !== e)
       if (next.hands[m].length < prev.hands[m].length) {
@@ -321,6 +322,8 @@ export const actions = {
   /** Sabotage: use a power-up. Block and Remove first need the player to pick a tile. */
   usePowerUp(effect: Effect) {
     if (state.mode !== "online" || state.you !== state.game.turn || state.game.powerUsed) return
+    if (!state.connected) return toast("Reconnecting… try again in a moment.", "error")
+    if (state.opponentAway) return toast("Your opponent is reconnecting…")
     if (EFFECTS[effect].needsTarget) {
       state.targeting = state.targeting === effect ? null : effect
       return
