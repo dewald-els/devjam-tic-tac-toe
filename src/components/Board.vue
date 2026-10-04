@@ -46,16 +46,20 @@ const label = (i: number) => {
 .cell:disabled {
   cursor: default;
 }
-.cell.hint:hover {
-  cursor: pointer;
-  transform: translateY(-3px) rotate(-1.5deg);
-  background-color: #fff4dc;
+/* Only on real hover devices: iOS keeps :hover stuck on the last tapped cell */
+@media (hover: hover) {
+  .cell.hint:hover {
+    cursor: pointer;
+    transform: translateY(-3px) rotate(-1.5deg);
+    background-color: #fff4dc;
+  }
 }
 .cell.hint:active {
   transform: translateY(2px);
 }
+/* Dark tile: coral and teal marks both stay clearly visible (yellow washed out the teal O) */
 .cell.win {
-  background-color: #ffc83d;
+  background-color: #2d2a4a;
   animation: bounce 0.6s ease-out;
 }
 @keyframes bounce {

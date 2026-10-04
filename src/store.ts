@@ -138,6 +138,14 @@ socket.on("disconnect", () => {
   state.queued = false
 })
 
+// Mobile browsers suspend websockets in the background: reconnect as soon as the tab is visible again.
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && !socket.connected) socket.connect()
+})
+window.addEventListener("online", () => {
+  if (!socket.connected) socket.connect()
+})
+
 socket.on("queued", () => {
   state.queued = true
 })
@@ -235,7 +243,12 @@ export const actions = {
     if (state.mode === "local" || (state.mode === "cpu" && state.game.turn === state.you)) {
       commit(index)
     } else if (state.mode === "online") {
-      if (state.you !== state.game.turn || !state.opponentPresent || !state.connected) return
+      if (!state.connected) {
+        socket.connect() // no-op if already connecting
+        return toast("Reconnecting… try again in a moment.", "error")
+      }
+      if (state.opponentAway) return toast("Your opponent is reconnecting…")
+      if (state.you !== state.game.turn || !state.opponentPresent) return
       socket.emit("move", index)
     }
   },

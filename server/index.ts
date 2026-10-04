@@ -8,7 +8,7 @@ import { applyMove, GameState, isFinished, Mark, newGame, other } from "../src/u
 const {
   PORT = 8080,
   CORS_ORIGIN = "*",
-  GRACE_MS = "30000", // how long a dropped player can come back
+  GRACE_MS = "60000", // how long a dropped player can come back
   IDLE_MS = String(30 * 60_000), // abandoned/idle room expiry
   WAITING_MS = String(10 * 60_000), // room with nobody joined
 } = process.env
@@ -301,11 +301,13 @@ io.on("connection", (socket) => {
     if (!room) return
     const mark = markOf(room, token)
     const snap = snapshot(room)
-    if (!mark || !snap.full || snap.away || mark !== room.game.turn) return
+    if (!mark || !snap.full || snap.away || mark !== room.game.turn) {
+      return void log("move_ignored", { code: room.code, player, index, mark, full: snap.full, away: snap.away, turn: room.game.turn })
+    }
 
     const next = applyMove(room.game, index as number)
-    if (!next) return void debug("move_invalid", { code: room.code, player, index })
-    debug("move", { code: room.code, mark, index })
+    if (!next) return void log("move_invalid", { code: room.code, player, index })
+    log("move", { code: room.code, mark, index, moves: next.moves })
     room.game = next
     if (next.winner) room.scores[next.winner]++
     else if (next.draw) room.scores.draws++

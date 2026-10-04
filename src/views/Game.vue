@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue"
+import { computed, ref, watch } from "vue"
 import Board from "../components/Board.vue"
 import Confetti from "../components/Confetti.vue"
 import Reactions from "../components/Reactions.vue"
@@ -20,6 +20,9 @@ const finished = computed(() => state.game.winner !== null || state.game.draw)
 const waiting = computed(() => state.mode === "online" && !state.opponentPresent)
 const iAskedRematch = computed(() => !!state.you && state.rematch.includes(state.you))
 const opponentAskedRematch = computed(() => state.rematch.length > 0 && !iAskedRematch.value)
+const rematchDismissed = ref(false)
+// a fresh request (or a new game) should pop up again after a "Not now"
+watch(opponentAskedRematch, () => (rematchDismissed.value = false))
 const iWon = computed(() => state.game.winner !== null && (state.you === null || state.game.winner === state.you))
 
 const status = computed(() => {
@@ -37,16 +40,58 @@ const status = computed(() => {
   return g.turn === state.you ? `Your turn!${first}` : state.mode === "cpu" ? "Computer is thinking…" : "Opponent's turn…"
 })
 
-const turnColor = computed(() => (state.game.turn === "X" ? "bg-coral text-white" : "bg-teal text-ink"))
+// Split a trailing emoji off the status so it can sit on its own white badge
+const statusParts = computed(() => {
+  const m = status.value.match(/^(.*?)\s*(\p{Extended_Pictographic}\uFE0F?)$/u)
+  return m ? { text: m[1], emoji: m[2] } : { text: status.value, emoji: "" }
+})
+const statusText = computed(() => statusParts.value.text)
+const statusEmoji = computed(() => statusParts.value.emoji)
+
+// Blue when it's your turn, yellow when it's the opponent's. Local play has one "you", so it keeps X/O colours.
+const turnColor = computed(() => {
+  if (state.you === null) return state.game.turn === "X" ? "bg-coral text-white" : "bg-teal text-ink"
+  return state.game.turn === state.you ? "bg-sky text-white" : "bg-sun"
+})
 const inviteBase = (import.meta.env.VITE_INVITE_BASE as string | undefined) ?? location.origin
 const shareUrl = computed(() => `${inviteBase}/?room=${state.code}`)
 
+// Clipboard API can fail on iOS (permissions / non-secure contexts), so fall back to a selection copy.
+function legacyCopy(text: string): boolean {
+  const el = document.createElement("textarea")
+  el.value = text
+  el.setAttribute("readonly", "")
+  el.style.cssText = "position:fixed;top:0;left:0;opacity:0;font-size:16px"
+  document.body.appendChild(el)
+  el.focus()
+  el.select()
+  el.setSelectionRange(0, text.length)
+  try {
+    return document.execCommand("copy")
+  } catch {
+    return false
+  } finally {
+    document.body.removeChild(el)
+  }
+}
+
+const canShare = typeof navigator !== "undefined" && typeof navigator.share === "function" && /iPhone|iPad|Android/i.test(navigator.userAgent)
+
 async function copy(text: string, message: string) {
+  if (canShare) {
+    try {
+      await navigator.share({ title: "Tic Tac Toe", text: `Join my game! Room ${state.code}`, url: text })
+      return
+    } catch (err) {
+      if ((err as Error)?.name === "AbortError") return // user closed the share sheet
+    }
+  }
   try {
     await navigator.clipboard.writeText(text)
     toast(message)
   } catch {
-    toast("Couldn't copy. Please copy it manually.", "error")
+    if (legacyCopy(text)) toast(message)
+    else toast("Couldn't copy. Please copy it manually.", "error")
   }
 }
 </script>
@@ -96,10 +141,20 @@ async function copy(text: string, message: string) {
     <div v-else-if="state.mode === 'local'" class="font-semibold text-ink/70">Playing locally on one device</div>
 
     <div
-      class="mt-4 mb-3 sm:my-0 px-4 sm:px-5 py-1 sm:py-2 rounded-full border-4 border-ink font-bold text-lg sm:text-xl shadow-pop-sm"
-      :class="finished || waiting || (state.mode === 'online' && !state.connected) || state.opponentAway ? 'bg-sun' : turnColor"
+      class="mt-4 mb-3 sm:my-0 flex items-stretch overflow-hidden rounded-full border-4 border-ink font-bold text-lg sm:text-xl shadow-pop-sm"
+      :class="
+        iWon
+          ? 'bg-green-600 text-white'
+          : state.game.winner
+            ? 'bg-red-600 text-white'
+            : finished || waiting || (state.mode === 'online' && !state.connected) || state.opponentAway
+            ? 'bg-sun'
+            : turnColor
+      "
       role="status">
-      {{ status }}
+      <span class="px-4 sm:px-5 py-1 sm:py-2" :class="statusEmoji ? 'pr-3 sm:pr-4' : ''">{{ statusText }}</span>
+      <!-- emoji sits on white, flush left edge, right edge follows the banner's curve (clipped by overflow-hidden) -->
+      <span v-if="statusEmoji" class="flex items-center bg-white pl-3 pr-4 sm:pr-5 py-1 sm:py-2" aria-hidden="true">{{ statusEmoji }}</span>
     </div>
 
     <Board />
@@ -120,7 +175,22 @@ async function copy(text: string, message: string) {
         {{ iAskedRematch ? "Waiting for opponent…" : opponentAskedRematch ? "Accept rematch" : "Play again" }}
       </button>
     </div>
-    <p v-if="opponentAskedRematch" class="font-bold text-grape -mt-1 sm:-mt-3">Your opponent wants a rematch!</p>
+
+    <div
+      v-if="opponentAskedRematch && !rematchDismissed"
+      class="fixed inset-0 z-20 flex items-center justify-center bg-ink/50 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Rematch request">
+      <div class="card !p-5 text-center max-w-xs">
+        <p class="text-xl font-bold">Rematch? 🔁</p>
+        <p class="font-semibold text-ink/70 mt-1">Your opponent wants to play again.</p>
+        <div class="flex justify-center gap-3 mt-4">
+          <button class="btn btn-ghost !py-2 !px-4 !text-base" @click="rematchDismissed = true">Not now</button>
+          <button class="btn !py-2 !px-4 !text-base" @click="actions.rematch">Accept</button>
+        </div>
+      </div>
+    </div>
 
     <Confetti v-if="iWon" :key="state.scores.X + '-' + state.scores.O" />
   </div>

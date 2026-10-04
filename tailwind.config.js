@@ -9,6 +9,7 @@ module.exports = {
         coral: "#FF5D73", // player X
         teal: "#1FC8B4", // player O
         sun: "#FFC83D", // primary actions
+        sky: "#3B9CFF", // "your turn" status
         grape: "#7C5CFF", // secondary / highlights
       },
       fontFamily: {
