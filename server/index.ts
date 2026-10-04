@@ -290,7 +290,7 @@ io.on("connection", (socket) => {
   })
 
   on("createRoom", (raw: unknown) => {
-    const variant = raw === "vanishing" ? "vanishing" : "classic"
+    const variant = raw === "vanishing" || raw === "sabotage" ? raw : "classic"
     if (myRoom()) return reject("You're already in a game.", "already_in_game", { action: "createRoom" })
     if (rooms.size >= MAX_ROOMS) {
       return reject("All rooms are busy right now. Try again in a minute!", "rooms_full", { action: "createRoom" })

@@ -222,3 +222,18 @@ test("sync answers with the room for seated players and null otherwise", async (
   b.emit("sync", "not-a-function") // bad payload is ignored, server stays up
   expect((await fetch(`http://127.0.0.1:${PORT}/healthz`)).ok).toBe(true)
 })
+
+test("sabotage rooms use a 6x6 board and keep the variant on rematch", async () => {
+  const a = await client(), b = await client()
+  a.emit("createRoom", "sabotage")
+  const created = await next(a, "roomState")
+  expect(created.game.variant).toBe("sabotage")
+  expect(created.game.board).toHaveLength(36)
+  b.emit("joinRoom", created.code); await next(b, "joined"); await next(a, "roomState")
+
+  a.emit("move", 35)
+  expect((await next(a, "roomState")).game.board[35]).toBe("X")
+  a.emit("move", 36) // out of range: ignored
+  b.emit("move", 0)
+  expect((await next(a, "roomState")).game.board[0]).toBe("O")
+})

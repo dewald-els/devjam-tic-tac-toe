@@ -142,6 +142,9 @@ async function copy(text: string, message: string) {
     <div v-if="state.game.variant === 'vanishing'" class="font-semibold text-ink/70 text-center">
       Vanishing mode: only 3 marks each, your oldest fades away
     </div>
+    <div v-if="state.game.variant === 'sabotage'" class="font-semibold text-ink/70 text-center">
+      Sabotage mode: get {{ state.game.winLength }} in a row on the {{ state.game.size }}x{{ state.game.size }} grid
+    </div>
 
     <div
       class="mt-4 mb-3 sm:my-0 flex items-stretch overflow-hidden rounded-full border-4 border-ink font-bold text-lg sm:text-xl shadow-pop-sm"

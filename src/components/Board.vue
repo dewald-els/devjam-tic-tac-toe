@@ -26,17 +26,29 @@ const fading = computed(() => {
 
 const label = (i: number) => {
   const cell = state.game.board[i]
-  return `Row ${Math.floor(i / 3) + 1}, column ${(i % 3) + 1}: ${cell ?? "empty"}`
+  const size = state.game.size
+  return `Row ${Math.floor(i / size) + 1}, column ${(i % size) + 1}: ${cell ?? "empty"}`
 }
 </script>
 
 <template>
-  <div class="grid grid-cols-3 grid-rows-3 gap-2 sm:gap-4 w-[min(88vw,22rem,46dvh)] h-[min(88vw,22rem,46dvh)]" role="group" aria-label="Game board">
+  <div
+    class="grid"
+    :class="
+      state.game.size > 3
+        ? 'gap-1 sm:gap-2 w-[min(92vw,28rem,50dvh)] h-[min(92vw,28rem,50dvh)]'
+        : 'gap-2 sm:gap-4 w-[min(88vw,22rem,46dvh)] h-[min(88vw,22rem,46dvh)]'
+    "
+    :style="{ gridTemplateColumns: `repeat(${state.game.size}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${state.game.size}, minmax(0, 1fr))` }"
+    role="group"
+    aria-label="Game board">
     <button
       v-for="(cell, i) in state.game.board"
       :key="i"
-      class="cell relative block w-full h-full min-w-0 min-h-0 overflow-hidden rounded-2xl border-4 border-ink bg-white shadow-pop-sm"
+      class="cell relative block w-full h-full min-w-0 min-h-0 overflow-hidden border-ink bg-white shadow-pop-sm"
       :class="{
+        'rounded-lg border-2': state.game.size > 3,
+        'rounded-2xl border-4': state.game.size <= 3,
         win: state.game.line?.includes(i),
         hint: !cell && canPlay,
         fading: i === fading,

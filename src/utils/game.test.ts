@@ -81,3 +81,37 @@ describe("vanishing variant", () => {
     expect(cpuMove(v([0, 3, 1, 4]), "hard")).toBe(2)
   })
 })
+
+describe("sabotage variant", () => {
+  const s = (moves: number[]) => play(moves, newGame("X", "sabotage"))
+
+  test("starts as an empty 6x6 board needing 4 in a row", () => {
+    const g = newGame("X", "sabotage")
+    expect(g.board).toHaveLength(36)
+    expect([g.size, g.winLength]).toEqual([6, 4])
+  })
+
+  test("4 in a row wins, 3 does not", () => {
+    // X: 0,1,2 ; O: 6,7,8
+    expect(s([0, 6, 1, 7, 2, 8]).winner).toBeNull()
+    const g = s([0, 6, 1, 7, 2, 8, 3])
+    expect(g.winner).toBe("X")
+    expect(g.line).toEqual([0, 1, 2, 3])
+  })
+
+  test("wins vertically and on both diagonals", () => {
+    expect(s([0, 1, 6, 2, 12, 3, 18]).winner).toBe("X")
+    expect(s([0, 1, 7, 2, 14, 3, 21]).winner).toBe("X")
+    expect(s([3, 0, 8, 1, 13, 2, 18]).winner).toBe("X")
+  })
+
+  test("a line cannot wrap around the board edge", () => {
+    expect(s([4, 6, 5, 7, 6 + 0 === 6 ? 12 : 0, 8, 13]).winner).toBeNull()
+  })
+
+  test("rejects out-of-range moves", () => {
+    const g = newGame("X", "sabotage")
+    expect(applyMove(g, 36)).toBeNull()
+    expect(applyMove(g, 35)).not.toBeNull()
+  })
+})
