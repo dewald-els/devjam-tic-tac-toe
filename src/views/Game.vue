@@ -99,9 +99,9 @@ async function copy(text: string, message: string) {
 </script>
 
 <template>
-  <div class="flex flex-col items-center gap-2.5 sm:gap-5">
-    <div class="flex items-center justify-between gap-3 w-full max-w-[22rem] sm:max-w-md">
-      <h1 class="text-2xl sm:text-4xl font-bold">
+  <div class="flex-1 min-h-0 w-full max-w-md flex flex-col items-center gap-2 sm:gap-4">
+    <div class="flex items-center justify-between gap-3 w-full shrink-0">
+      <h1 class="text-xl sm:text-4xl font-bold">
         <span class="text-coral">X</span> Tic Tac Toe <span class="text-teal">O</span>
       </h1>
       <div class="relative flex items-center gap-2">
@@ -128,7 +128,7 @@ async function copy(text: string, message: string) {
       </div>
     </div>
 
-    <div v-if="state.mode === 'online' && !state.opponentPresent" class="card !py-2 !px-4 sm:!px-5 flex flex-row items-center justify-between gap-5 min-w-[17rem]">
+    <div v-if="state.mode === 'online' && !state.opponentPresent" class="card !py-2 !px-4 sm:!px-5 flex flex-row items-center justify-between gap-5 min-w-[17rem] shrink-0">
       <div class="leading-tight text-left">
         <div class="text-[10px] font-semibold text-ink/60 uppercase tracking-wide">Room code</div>
         <div class="text-lg font-bold tracking-[0.2em]">{{ state.code }}</div>
@@ -137,19 +137,19 @@ async function copy(text: string, message: string) {
         Copy link
       </button>
     </div>
-    <div v-else-if="state.mode === 'cpu'" class="font-semibold text-ink/70">
+    <div v-else-if="state.mode === 'cpu'" class="font-semibold text-ink/70 text-sm sm:text-base shrink-0">
       You (X) vs computer · {{ state.cpuLevel === "hard" ? "unbeatable" : "easy" }}
     </div>
-    <div v-else-if="state.mode === 'local'" class="font-semibold text-ink/70">Playing locally on one device</div>
-    <div v-if="state.game.variant === 'vanishing'" class="font-semibold text-ink/70 text-center">
+    <div v-else-if="state.mode === 'local'" class="font-semibold text-ink/70 text-sm sm:text-base shrink-0">Playing locally on one device</div>
+    <div v-if="state.game.variant === 'vanishing'" class="font-semibold text-ink/70 text-center text-sm sm:text-base leading-tight shrink-0">
       Vanishing mode: only 3 marks each, your oldest fades away
     </div>
-    <div v-if="state.game.variant === 'sabotage'" class="font-semibold text-ink/70 text-center">
+    <div v-if="state.game.variant === 'sabotage'" class="font-semibold text-ink/70 text-center text-sm sm:text-base leading-tight shrink-0">
       Sabotage mode: get {{ state.game.winLength }} in a row. Tiles hide traps and power-ups!
     </div>
 
     <div
-      class="mt-4 mb-3 sm:my-0 flex items-stretch overflow-hidden rounded-full border-4 border-ink font-bold text-lg sm:text-xl shadow-pop-sm"
+      class="shrink-0 flex items-stretch overflow-hidden rounded-full border-4 border-ink font-bold text-lg sm:text-xl shadow-pop-sm"
       :class="
         iWon
           ? 'bg-green-600 text-white'
@@ -165,13 +165,16 @@ async function copy(text: string, message: string) {
       <span v-if="statusEmoji" class="flex items-center bg-white pl-3 pr-4 sm:pr-5 py-1 sm:py-2" aria-hidden="true">{{ statusEmoji }}</span>
     </div>
 
-    <Board />
+    <!-- The board takes whatever height is left and sizes itself to fit it -->
+    <div class="board-area flex-1 min-h-0 w-full flex items-center justify-center">
+      <Board />
+    </div>
     <PowerUps v-if="state.game.variant === 'sabotage'" />
     <Scoreboard />
 
     <Reactions v-if="state.mode === 'online' && state.opponentPresent" />
 
-    <div v-if="waiting && state.hadOpponent" class="card !p-3 text-center max-w-xs">
+    <div v-if="waiting && state.hadOpponent" class="card !p-3 text-center max-w-xs shrink-0">
       <p class="font-semibold">
         Your opponent left before the game started. Share the code
         <b class="tracking-widest">{{ state.code }}</b> with someone else<template v-if="classicRoom">, or find a new opponent</template>.
@@ -180,8 +183,8 @@ async function copy(text: string, message: string) {
       <button v-if="classicRoom" class="btn btn-grape mt-3" @click="actions.findNewOpponent">Find a new opponent</button>
     </div>
 
-    <div class="flex flex-wrap justify-center gap-3 items-center sm:min-h-[4.5rem]">
-      <button v-if="finished" class="btn" :disabled="iAskedRematch" @click="actions.rematch">
+    <div class="shrink-0 flex justify-center gap-3 items-center h-12">
+      <button v-if="finished" class="btn !py-1.5 !text-base" :disabled="iAskedRematch" @click="actions.rematch">
         {{ iAskedRematch ? "Waiting for opponent…" : opponentAskedRematch ? "Accept rematch" : "Play again" }}
       </button>
     </div>

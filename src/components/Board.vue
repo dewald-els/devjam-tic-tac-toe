@@ -41,12 +41,8 @@ const label = (i: number) => {
 
 <template>
   <div
-    class="grid"
-    :class="
-      state.game.size > 3
-        ? 'gap-1 sm:gap-2 w-[min(92vw,28rem,50dvh)] h-[min(92vw,28rem,50dvh)] short:w-[min(92vw,28rem,44dvh)] short:h-[min(92vw,28rem,44dvh)]'
-        : 'gap-2 sm:gap-4 w-[min(88vw,22rem,46dvh)] h-[min(88vw,22rem,46dvh)] short:w-[min(88vw,22rem,41dvh)] short:h-[min(88vw,22rem,41dvh)]'
-    "
+    class="board grid"
+    :class="state.game.size > 3 ? 'gap-1 sm:gap-2' : 'gap-2 sm:gap-4'"
     :style="{ gridTemplateColumns: `repeat(${state.game.size}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${state.game.size}, minmax(0, 1fr))` }"
     role="group"
     aria-label="Game board">
@@ -86,6 +82,11 @@ const label = (i: number) => {
 </template>
 
 <style scoped>
+/* Largest square that fits the space the parent leaves (.board-area is the size container) */
+.board {
+  width: min(100cqw, 100cqh, 30rem);
+  height: min(100cqw, 100cqh, 30rem);
+}
 .cell {
   container-type: size;
   transition: transform 0.12s, background-color 0.2s;

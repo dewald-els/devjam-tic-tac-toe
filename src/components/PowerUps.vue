@@ -37,12 +37,12 @@ const hint = computed(() => {
 </script>
 
 <template>
-  <div class="w-full max-w-[28rem] flex flex-col gap-1 items-center" aria-label="Power-ups">
-    <div class="flex flex-wrap justify-center items-center gap-2 min-h-[2.75rem]">
+  <div class="w-full shrink-0 flex flex-col gap-1 items-center" aria-label="Power-ups">
+    <div class="flex flex-wrap justify-center items-center gap-2">
       <button
         v-for="(effect, i) in state.game.hands[me]"
         :key="`${effect}${i}`"
-        class="rounded-xl border-4 border-ink px-3 py-1 font-bold shadow-pop-sm flex items-center gap-1 transition-colors"
+        class="rounded-xl border-4 border-ink px-2.5 py-0.5 sm:px-3 sm:py-1 font-bold shadow-pop-sm flex items-center gap-1 transition-colors"
         :class="state.targeting === effect ? 'bg-coral text-white' : info === effect ? 'bg-white' : 'bg-sun'"
         :aria-pressed="info === effect"
         @click="pick(effect)">
@@ -60,27 +60,28 @@ const hint = computed(() => {
     </div>
 
     <!-- What the tapped power-up does, and the button that actually plays it -->
-    <div v-if="info" class="card !p-3 w-full flex flex-col gap-2 text-center" role="status">
+    <div
+      v-if="info && !state.targeting"
+      class="fixed inset-x-3 bottom-3 z-10 mx-auto max-w-sm card !p-3 flex flex-col gap-2 text-center"
+      role="status">
       <p class="font-bold">{{ EFFECTS[info].icon }} {{ EFFECTS[info].name }}</p>
       <p class="text-sm text-ink/80 leading-tight">
         {{ EFFECTS[info].desc }}
         <span v-if="EFFECTS[info].endsTurn"> Uses up your turn.</span>
       </p>
       <div class="flex justify-center gap-2">
-        <button
-          v-if="state.targeting === info"
-          class="btn btn-ghost !py-1 !px-4 !text-base"
-          @click="cancelTargeting">
-          Cancel
-        </button>
-        <button v-else class="btn !py-1 !px-4 !text-base" :disabled="!canUse" @click="info && use(info)">
+        <button class="btn btn-ghost !py-1 !px-4 !text-base" @click="picked = null">Close</button>
+        <button class="btn !py-1 !px-4 !text-base" :disabled="!canUse" @click="info && use(info)">
           {{ canUse ? (EFFECTS[info].needsTarget ? "Use, then pick a tile" : "Use") : myTurn ? "Already used one" : "Wait for your turn" }}
         </button>
       </div>
     </div>
 
-    <p class="text-sm font-semibold text-ink/70 min-h-[1.25rem]" role="status">{{ hint }}</p>
-    <p v-if="state.game.hands[other(me)].length" class="text-xs text-ink/60">
+    <div class="flex items-center justify-center gap-2 text-sm font-semibold text-ink/70 h-7" role="status">
+      <span class="leading-tight">{{ hint }}</span>
+      <button v-if="state.targeting" class="btn btn-ghost !py-0 !px-3 !text-sm !border-2" @click="cancelTargeting">Cancel</button>
+    </div>
+    <p v-if="state.game.hands[other(me)].length" class="text-xs text-ink/60 leading-tight">
       Opponent holds:
       <span v-for="(effect, i) in state.game.hands[other(me)]" :key="`${effect}${i}`" :title="EFFECTS[effect].name">
         {{ EFFECTS[effect].icon }}
