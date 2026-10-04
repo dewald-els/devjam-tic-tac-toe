@@ -13,6 +13,8 @@ const {
   WAITING_MS = String(10 * 60_000), // room with nobody joined
 } = process.env
 const MAX_ROOMS = 200
+const MAX_CONN_PER_IP = Number(process.env.MAX_CONN_PER_IP ?? 30)
+const ipConns = new Map<string, number>()
 const MAX_ROOMS_PER_IP = Number(process.env.MAX_ROOMS_PER_IP ?? 5)
 const RATE_WINDOW_MS = 10_000
 const RATE_MAX_EVENTS = 40
@@ -85,6 +87,8 @@ const server = http.createServer(app)
 const io = new Server(server, {
   transports: ["websocket"],
   maxHttpBufferSize: 1024,
+  pingInterval: 10_000, // notice silently-dead mobile connections in ~15s instead of ~45s
+  pingTimeout: 5_000,
   cors: { origin: CORS_ORIGIN, methods: ["GET", "POST"] },
 })
 
@@ -156,14 +160,20 @@ function vacate(room: Room, mark: Mark, reason: "left" | "timeout") {
 
 function seat(socket: Socket, room: Room, mark: Mark, announce = true) {
   const s = room.seats[mark]!
+  const oldId = s.socketId
+  // Point the seat at the new socket first: the old socket's disconnect handler then sees it was replaced
+  // and does nothing (no phantom "away" broadcast, no grace timer left running against a live player).
+  s.socketId = socket.id
   clearTimeout(s.timer)
-  if (s.socketId && s.socketId !== socket.id) {
-    // same player opened a second tab: the newest connection wins
-    const old = io.sockets.sockets.get(s.socketId)
-    old?.emit("replaced")
+  if (oldId && oldId !== socket.id) {
+    const old = io.sockets.sockets.get(oldId)
+    // A reconnect of the same page (stale/zombie socket) is closed silently; only a genuinely different
+    // tab (e.g. a duplicated tab sharing the token) is told it was replaced.
+    const instance = socket.handshake.auth?.instance
+    const samePage = typeof instance === "string" && instance === old?.handshake.auth?.instance
+    if (old && !samePage) old.emit("replaced")
     old?.disconnect(true)
   }
-  s.socketId = socket.id
   socket.join(room.code)
   socket.emit("joined", { mark })
   if (announce) broadcast(room)
@@ -178,7 +188,23 @@ io.on("connection", (socket) => {
   const token = auth
   const ip = clientIp(socket)
   const player = token.slice(0, 6) // short id for logs; never log the full token
+  if ((ipConns.get(ip) ?? 0) >= MAX_CONN_PER_IP) {
+    log("rejected", { player, reason: "ip_connection_limit", ip })
+    socket.disconnect(true)
+    return
+  }
+  ipConns.set(ip, (ipConns.get(ip) ?? 0) + 1)
   log("connected", { player, ip, sockets: io.engine.clientsCount })
+
+  // One bad payload must never take down a handler (or leave state half-updated without a log line)
+  const on = (event: string, fn: (...args: any[]) => void) =>
+    socket.on(event, (...args: any[]) => {
+      try {
+        fn(...args)
+      } catch (err) {
+        log("handler_error", { player, event, error: String(err), stack: (err as Error).stack })
+      }
+    })
 
   // Every refused action is logged with why
   const reject = (message: string, reason: string, extra: Record<string, unknown> = {}) => {
@@ -220,9 +246,16 @@ io.on("connection", (socket) => {
     socket.emit("noGame")
   }
 
-  socket.on("quickMatch", () => {
+  // Client liveness probe (a returning tab can't trust a socket that "looks" connected) + state resync
+  on("sync", (cb: unknown) => {
+    if (typeof cb !== "function") return
+    const room = myRoom()
+    cb(room && markOf(room, token) ? snapshot(room) : null)
+  })
+
+  on("quickMatch", () => {
     if (myRoom()) return reject("You're already in a game.", "already_in_game", { action: "quickMatch" })
-    if (waiting && waiting.id !== socket.id && waiting.connected && !roomByToken.has(waiting.handshake.auth.token)) {
+    if (waiting && waiting.id !== socket.id && waiting.handshake.auth.token !== token && waiting.connected && !roomByToken.has(waiting.handshake.auth.token)) {
       if (rooms.size >= MAX_ROOMS) return reject("All rooms are busy right now.", "rooms_full", { action: "quickMatch" })
       const host = waiting
       waiting = null
@@ -252,11 +285,11 @@ io.on("connection", (socket) => {
     }
   })
 
-  socket.on("cancelQueue", () => {
+  on("cancelQueue", () => {
     if (waiting?.id === socket.id) waiting = null
   })
 
-  socket.on("createRoom", () => {
+  on("createRoom", () => {
     if (myRoom()) return reject("You're already in a game.", "already_in_game", { action: "createRoom" })
     if (rooms.size >= MAX_ROOMS) {
       return reject("All rooms are busy right now. Try again in a minute!", "rooms_full", { action: "createRoom" })
@@ -282,7 +315,7 @@ io.on("connection", (socket) => {
     log("room_created", { code: room.code, player })
   })
 
-  socket.on("joinRoom", (raw: unknown) => {
+  on("joinRoom", (raw: unknown) => {
     if (myRoom()) return reject("You're already in a game.", "already_in_game", { action: "joinRoom" })
     const code = typeof raw === "string" ? raw.trim().toUpperCase().slice(0, 8) : ""
     const room = rooms.get(code)
@@ -296,7 +329,7 @@ io.on("connection", (socket) => {
     log("room_joined", { code, player, mark })
   })
 
-  socket.on("move", (index: unknown) => {
+  on("move", (index: unknown) => {
     const room = myRoom()
     if (!room) return
     const mark = markOf(room, token)
@@ -317,7 +350,7 @@ io.on("connection", (socket) => {
     broadcast(room)
   })
 
-  socket.on("rematch", () => {
+  on("rematch", () => {
     const room = myRoom()
     if (!room || !isFinished(room.game)) return
     const mark = markOf(room, token)
@@ -333,7 +366,7 @@ io.on("connection", (socket) => {
   })
 
   let lastReaction = 0
-  socket.on("react", (emoji: unknown) => {
+  on("react", (emoji: unknown) => {
     const room = myRoom()
     const now = Date.now()
     if (!room || typeof emoji !== "string" || !REACTIONS.has(emoji) || now - lastReaction < 500) return
@@ -341,14 +374,17 @@ io.on("connection", (socket) => {
     io.to(room.code).emit("reaction", { from: markOf(room, token), emoji })
   })
 
-  socket.on("leaveRoom", () => {
+  on("leaveRoom", () => {
     const room = myRoom()
     const mark = room && markOf(room, token)
     if (room && mark) vacate(room, mark, "left")
   })
 
-  socket.on("disconnect", (reason) => {
+  on("disconnect", (reason) => {
     log("disconnected", { player, reason, sockets: io.engine.clientsCount })
+    const left = (ipConns.get(ip) ?? 1) - 1
+    if (left <= 0) ipConns.delete(ip)
+    else ipConns.set(ip, left)
     if (waiting?.id === socket.id) waiting = null
     const room = myRoom()
     const mark = room && markOf(room, token)
@@ -356,7 +392,9 @@ io.on("connection", (socket) => {
     const s = room.seats[mark]!
     if (s.socketId !== socket.id) return // replaced by a newer connection
     s.socketId = null
-    s.timer = setTimeout(() => vacate(room, mark, "timeout"), Number(GRACE_MS))
+    s.timer = setTimeout(() => {
+      if (s.socketId === null) vacate(room, mark, "timeout") // never evict a player who is back
+    }, Number(GRACE_MS))
     broadcast(room)
     log("player_away", { code: room.code, mark })
   })
@@ -370,5 +408,12 @@ setInterval(() => {
     if (now - room.lastActive > (waiting ? Number(WAITING_MS) : Number(IDLE_MS))) destroy(room, "expired")
   }
 }, 60_000).unref()
+
+for (const sig of ["SIGTERM", "SIGINT"] as const) {
+  process.on(sig, () => {
+    log("shutdown", { signal: sig, rooms: rooms.size, sockets: io.engine.clientsCount })
+    process.exit(0)
+  })
+}
 
 server.listen(Number(PORT), "0.0.0.0", () => log("server_started", { port: PORT }))

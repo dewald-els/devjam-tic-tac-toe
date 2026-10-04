@@ -33,7 +33,7 @@ const next = <T = any>(s: Socket, ev: string) =>
   })
 
 beforeAll(async () => {
-  proc = Bun.spawn(["bun", "server/index.ts"], { env: { ...process.env, PORT: String(PORT), GRACE_MS: "400", MAX_ROOMS_PER_IP: "1000" }, stdout: "inherit", stderr: "inherit" })
+  proc = Bun.spawn(["bun", "server/index.ts"], { env: { ...process.env, PORT: String(PORT), GRACE_MS: "400", MAX_ROOMS_PER_IP: "1000", MAX_CONN_PER_IP: "1000" }, stdout: "inherit", stderr: "inherit" })
   for (let i = 0; i < 50; i++) {
     try { if ((await fetch(`http://127.0.0.1:${PORT}/healthz`)).ok) return } catch {}
     await Bun.sleep(100)
@@ -174,4 +174,51 @@ test("leaving mid-game ends it; leaving before the first move keeps the room ope
   const d = await client()
   d.emit("joinRoom", code)
   expect(await next(d, "errorMessage")).toContain("doesn't exist")
+})
+
+test("a second connection with the same token takes over without a leftover timer killing the game", async () => {
+  const a = await client()
+  const token = `takeover${Date.now()}token`
+  const b = await client(token)
+  a.emit("createRoom"); const { code } = await next(a, "roomState")
+  b.emit("joinRoom", code); await next(b, "joined"); await next(a, "roomState")
+  a.emit("move", 0); await next(a, "roomState") // game in progress, so a timeout would destroy the room
+
+  let ended = false, awayCount = 0
+  a.on("opponentLeft", () => (ended = true))
+  a.on("roomState", (st) => { if (st.away) awayCount++ })
+
+  const b2 = await client(token) // old socket b is still open (zombie)
+  expect((await next(b2, "joined")).mark).toBe("O")
+  await next(b, "replaced")
+
+  await Bun.sleep(900) // well past GRACE_MS (400)
+  expect(ended).toBe(false)
+  expect(awayCount).toBe(0) // swapping sockets must not flash the opponent as "away"
+  b2.emit("move", 4)
+  let st = await next(a, "roomState")
+  while (st.game.board[4] === null) st = await next(a, "roomState") // skip queued earlier updates
+  expect(st.game.board[4]).toBe("O")
+})
+
+test("quick match never pairs a player with their own second tab", async () => {
+  const token = `selfmatch${Date.now()}token`
+  const a = await client(token), a2 = await client(token), c = await client()
+  a.emit("quickMatch"); await next(a, "queued")
+  a2.emit("quickMatch"); await next(a2, "queued") // waits instead of matching with itself
+  c.emit("quickMatch")
+  expect((await next(a2, "joined")).mark).toBe("X")
+  expect((await next(c, "joined")).mark).toBe("O")
+})
+
+const ask = (s: Socket, ev: string) => new Promise<any>((r) => s.emit(ev, r))
+
+test("sync answers with the room for seated players and null otherwise", async () => {
+  const a = await client(), b = await client()
+  expect(await ask(a, "sync")).toBeNull()
+  a.emit("createRoom"); const { code } = await next(a, "roomState")
+  const snap = await ask(a, "sync")
+  expect(snap.code).toBe(code)
+  b.emit("sync", "not-a-function") // bad payload is ignored, server stays up
+  expect((await fetch(`http://127.0.0.1:${PORT}/healthz`)).ok).toBe(true)
 })

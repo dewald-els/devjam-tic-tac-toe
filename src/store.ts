@@ -138,13 +138,23 @@ socket.on("disconnect", () => {
   state.queued = false
 })
 
-// Mobile browsers suspend websockets in the background: reconnect as soon as the tab is visible again.
+// Mobile browsers suspend websockets in the background. When the tab comes back, either reconnect, or (if the
+// socket only *looks* connected) probe it: no answer in 4s means it's dead, so force a reconnect. A good
+// answer also resyncs our view of the room in case we missed updates while suspended.
+function checkConnection() {
+  if (!socket.connected) return void socket.connect()
+  ;(socket.timeout(4000) as any).emit("sync", (err: unknown, room: RoomSnapshot | null) => {
+    if (err) return void socket.io.engine?.close() // socket.io then reconnects and the server re-seats us
+    if (state.mode !== "online") return
+    if (room) applyRoom(room)
+    else handleNoGame()
+  })
+}
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible" && !socket.connected) socket.connect()
+  if (document.visibilityState === "visible") checkConnection()
 })
-window.addEventListener("online", () => {
-  if (!socket.connected) socket.connect()
-})
+window.addEventListener("online", checkConnection)
+window.addEventListener("pageshow", (e) => e.persisted && checkConnection()) // iOS back/forward cache
 
 socket.on("queued", () => {
   state.queued = true
@@ -171,11 +181,14 @@ socket.on("roomState", (room) => {
   else if (wasAway && !state.opponentAway) toast("Your opponent is back!")
 })
 
-socket.on("noGame", () => {
-  if (state.mode !== "online") return
+function handleNoGame() {
   reset()
   router.replace("/")
   toast("Your game ended while you were away.")
+}
+
+socket.on("noGame", () => {
+  if (state.mode === "online") handleNoGame()
 })
 
 socket.on("replaced", () => {
@@ -202,6 +215,15 @@ socket.on("reaction", ({ from, emoji }) => {
 
 socket.on("errorMessage", (message) => toast(message, "error"))
 
+// socket.io buffers emits while offline and replays them on reconnect, which would fire a stale
+// create/join/quick-match later. Refuse up front instead.
+function ensureConnected(): boolean {
+  if (socket.connected) return true
+  socket.connect()
+  toast("Not connected yet. Trying again, give it a moment.", "error")
+  return false
+}
+
 // --- actions ---
 export const actions = {
   startLocal() {
@@ -221,6 +243,7 @@ export const actions = {
   },
 
   quickMatch() {
+    if (!ensureConnected()) return
     socket.emit("quickMatch")
   },
 
@@ -230,12 +253,14 @@ export const actions = {
   },
 
   createRoom() {
+    if (!ensureConnected()) return
     socket.emit("createRoom")
   },
 
   joinRoom(code: string) {
     const clean = code.trim().toUpperCase()
     if (!clean) return toast("Enter a room code first.", "error")
+    if (!ensureConnected()) return
     socket.emit("joinRoom", clean)
   },
 

@@ -30,6 +30,7 @@ interface ClientToServerEvents {
   rematch: () => void
   react: (emoji: string) => void
   leaveRoom: () => void
+  sync: (ack: (room: RoomSnapshot | null) => void) => void
 }
 
 // Same origin in production (the server also serves the built client).
@@ -51,9 +52,13 @@ function playerToken(): string {
   }
 }
 
+// Unique per page load (the token above is per tab and is even copied when a tab is duplicated). Lets the
+// server tell "this same page reconnected" apart from "a different tab took over".
+const instance = Math.random().toString(36).slice(2) + Date.now().toString(36)
+
 const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(url as string, {
   transports: ["websocket"],
-  auth: { token: playerToken() },
+  auth: { token: playerToken(), instance },
   reconnectionDelay: 1000,
   reconnectionDelayMax: 5000,
 })
