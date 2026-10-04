@@ -41,6 +41,8 @@ export interface GameState {
   hands: Record<Mark, PowerUp[]>
   /** Sabotage: moves the current player still has this turn (Double and Skip change it). */
   movesLeft: number
+  /** Sabotage: extra tiles the next player gets when the turn passes (earned by the other player's Skip trap). */
+  bonusMoves: number
   /** Sabotage: a power-up was already played this turn. */
   powerUsed: boolean
 }
@@ -89,6 +91,7 @@ export function newGame(starter: Mark = "X", variant: Variant = "classic"): Game
     blocked: [],
     hands: { X: [], O: [] },
     movesLeft: 1,
+    bonusMoves: 0,
     powerUsed: false,
   }
 }
@@ -243,14 +246,17 @@ export function applySabotageMove(game: GameState, hidden: Record<number, Effect
   const out = outcome(game, d)
   const over = out.winner !== null || out.draw
   const keepTurn = !over && d.movesLeft > 0
+  // Skip: my next turn is skipped, so the opponent plays twice. Remembered until the turn actually passes
+  // (I may still have tiles left this turn, e.g. after a Double).
+  const bonusMoves = game.bonusMoves + (d.skipMover ? 1 : 0)
 
   return {
     ...game,
     ...out,
     revealed,
     moves: game.moves + 1,
-    // Skip: opponent plays, my turn is skipped, opponent plays again
-    movesLeft: keepTurn ? d.movesLeft : d.skipMover ? 2 : 1,
+    movesLeft: keepTurn ? d.movesLeft : 1 + bonusMoves,
+    bonusMoves: keepTurn ? bonusMoves : 0,
     powerUsed: keepTurn ? game.powerUsed : false,
     turn: keepTurn ? me : other(me),
   }
@@ -279,7 +285,7 @@ export function usePowerUp(game: GameState, effect: Effect, target?: number): Ga
   const out = outcome(game, d)
   if (def.endsTurn && out.winner === null && !out.draw) {
     // Playing a power-up uses up the turn
-    return { ...game, ...out, turn: other(me), movesLeft: 1, powerUsed: false }
+    return { ...game, ...out, turn: other(me), movesLeft: 1 + game.bonusMoves, bonusMoves: 0, powerUsed: false }
   }
   return { ...game, ...out, movesLeft: d.movesLeft, powerUsed: true }
 }

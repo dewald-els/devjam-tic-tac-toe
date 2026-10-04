@@ -85,8 +85,20 @@ function announce(prev: GameState, next: GameState) {
     const found = Object.keys(next.revealed).find((k) => !(Number(k) in prev.revealed))
     if (found !== undefined) {
       const e = EFFECTS[next.revealed[Number(found)]]
-      const who = state.you === null ? prev.turn : prev.turn === state.you ? "You" : "Your opponent"
-      toast(`${who} found ${e.icon} ${e.name}. ${e.desc}`)
+      const mine = prev.turn === state.you
+      const effect = `${e.icon} ${e.name}`
+      // Traps say what happens to whoever found them; power-ups just say what they do
+      toast(`${mine ? "You" : "Your opponent"} found ${effect}. ${e.claimed?.[mine ? "you" : "opponent"] ?? e.desc}`)
+    }
+  }
+  // Sabotage: a power-up left someone's hand without a move being made (and it isn't a rematch reset)
+  if (next.variant === "sabotage" && next.moves === prev.moves) {
+    for (const m of ["X", "O"] as Mark[]) {
+      const used = prev.hands[m].find((e, i) => next.hands[m][i] !== e)
+      if (next.hands[m].length < prev.hands[m].length) {
+        const e = EFFECTS[used ?? prev.hands[m][prev.hands[m].length - 1]]
+        toast(`${m === state.you ? "You" : "Your opponent"} played ${e.icon} ${e.name}. ${e.desc}`)
+      }
     }
   }
   if (!isFinished(prev) && isFinished(next)) {
@@ -133,7 +145,7 @@ function reset() {
 
 function applyRoom(room: RoomSnapshot) {
   announce(state.game, room.game)
-  if (room.game.turn !== state.you) state.targeting = null
+  if (room.game.turn !== state.you || isFinished(room.game)) state.targeting = null
   state.code = room.code
   state.game = room.game
   state.scores = room.scores

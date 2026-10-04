@@ -178,6 +178,66 @@ describe("sabotage variant", () => {
     expect(applySabotageMove(after, none, 11)!.turn).toBe("O")
   })
 
+  test("skip claimed mid-turn (during a Double) is not lost", () => {
+    const hidden: Record<number, Effect> = { 0: "double", 1: "skip" }
+    let g = sab([0, 20], hidden) // X holds Double
+    g = usePowerUp(g, "double")! // X now plays two tiles
+    g = sab([1], hidden, g) // first tile hides Skip: X still has a tile left
+    expect([g.turn, g.movesLeft]).toEqual(["X", 1])
+    g = sab([2], hidden, g) // second tile ends the turn
+    expect([g.turn, g.movesLeft]).toEqual(["O", 2]) // O plays twice
+    g = sab([21, 22], hidden, g)
+    expect(g.turn).toBe("X")
+  })
+
+  test("skip while already playing two tiles still passes the penalty on", () => {
+    const hidden: Record<number, Effect> = { 0: "skip", 1: "skip" }
+    let g = sab([0], hidden) // X skip -> O gets two moves
+    g = sab([1], hidden, g) // O's first tile is Skip too
+    expect([g.turn, g.movesLeft]).toEqual(["O", 1])
+    g = sab([2], hidden, g)
+    expect([g.turn, g.movesLeft]).toEqual(["X", 2]) // X now plays twice
+  })
+
+  test("a power-up that ends the turn pays out a pending skip", () => {
+    const hidden: Record<number, Effect> = { 0: "double", 1: "block", 2: "skip" }
+    let g = sab([0, 20, 1, 21], hidden) // X holds Double + Block
+    g = usePowerUp(g, "double")!
+    g = sab([2], hidden, g) // Skip on the first of two tiles
+    g = sab([3], hidden, g) // turn ends -> O plays twice
+    expect([g.turn, g.movesLeft]).toEqual(["O", 2])
+  })
+
+  test("fuzz: random sabotage games never break the rules", () => {
+    const names: Effect[] = ["block", "double", "remove", "reverse"]
+    for (let n = 0; n < 300; n++) {
+      const hidden = generateHidden(6)
+      let g = newGame(n % 2 ? "X" : "O", "sabotage")
+      for (let step = 0; step < 200 && !isFinished(g); step++) {
+        // sometimes try a power-up (valid or not), otherwise place a tile
+        let next: GameState | null = null
+        if (Math.random() < 0.25) {
+          next = usePowerUp(g, names[Math.floor(Math.random() * 4)], Math.floor(Math.random() * 36))
+        }
+        if (!next) {
+          const open = g.board.flatMap((c, i) => (c === null && !g.blocked.includes(i) ? [i] : []))
+          expect(open.length).toBeGreaterThan(0) // an unfinished game always has a legal tile
+          next = applySabotageMove(g, hidden, open[Math.floor(Math.random() * open.length)])
+          expect(next).not.toBeNull()
+        }
+        g = next!
+        expect(g.board).toHaveLength(36)
+        expect(g.movesLeft).toBeGreaterThanOrEqual(1)
+        expect(g.bonusMoves).toBeGreaterThanOrEqual(0)
+        for (const b of g.blocked) expect(g.board[b]).toBeNull() // nothing stands on a blocked tile
+        expect(new Set(g.blocked).size).toBe(g.blocked.length)
+        if (g.winner) expect(g.line!.every((i) => g.board[i] === g.winner)).toBe(true)
+        // revealed tiles only ever come from the hidden map
+        for (const [i, e] of Object.entries(g.revealed)) expect(hidden[Number(i)]).toBe(e)
+      }
+    }
+  })
+
   test("generateHidden hides roughly 18% of tiles", () => {
     const hidden = generateHidden(6)
     expect(Object.keys(hidden)).toHaveLength(6)

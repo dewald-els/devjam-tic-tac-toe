@@ -26,8 +26,10 @@ export interface Draft {
 export interface EffectDef {
   name: string
   icon: string
-  /** Shown to the player. Keep it neutral: both players read it. */
+  /** General description (info popup, power-up tray). Both players read it, so don't say "you". */
   desc: string
+  /** Traps: what happened, worded for the player who claimed the tile and for the other player. */
+  claimed?: { you: string; opponent: string }
   kind: "trap" | "powerup"
   /** Relative chance of being hidden under a tile. */
   weight: number
@@ -72,14 +74,16 @@ export const EFFECTS = registry({
   skip: trap({
     name: "Skip",
     icon: "⏭️",
-    desc: "Trap! They lose their next turn.",
+    desc: "Trap! Whoever claims this tile loses their next turn.",
+    claimed: { you: "You lose your next turn.", opponent: "They lose their next turn." },
     onClaim: (d) => void (d.skipMover = true),
   }),
 
   bomb: trap({
     name: "Bomb",
     icon: "💣",
-    desc: "Trap! The mark is blown away and the tile is blocked.",
+    desc: "Trap! The claimer's mark is blown away and the tile is blocked.",
+    claimed: { you: "Your mark is blown away and the tile is blocked.", opponent: "Their mark is blown away and the tile is blocked." },
     onClaim: (d, _id, index) => {
       d.board[index] = null
       d.blocked.push(index)
