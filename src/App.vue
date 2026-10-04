@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import InstallPrompt from "./components/InstallPrompt.vue"
 import ToastHost from "./components/ToastHost.vue"
 import { useGame } from "./store"
 
@@ -10,6 +11,7 @@ const { state } = useGame()
     <router-view />
   </main>
   <ToastHost />
+  <InstallPrompt />
   <div
     v-if="!state.connected && state.mode === 'online'"
     class="fixed top-3 left-1/2 -translate-x-1/2 bg-ink text-cream px-4 py-2 rounded-full text-sm font-semibold"
