@@ -3,7 +3,20 @@ import express from "express"
 import http from "http"
 import { dirname, join } from "path"
 import { Server, Socket } from "socket.io"
-import { applyMove, GameState, isFinished, Mark, newGame, other } from "../src/utils/game"
+import {
+  applyMove,
+  applySabotageMove,
+  boardConfig,
+  Effect,
+  GameState,
+  generateHidden,
+  isFinished,
+  Mark,
+  newGame,
+  other,
+  isPowerUp,
+  usePowerUp,
+} from "../src/utils/game"
 
 const {
   PORT = 8080,
@@ -31,6 +44,8 @@ interface Room {
   code: string
   seats: Partial<Record<Mark, Seat>>
   game: GameState
+  /** Sabotage only: what each tile secretly hides. Never sent to clients before the tile is claimed. */
+  hidden: Record<number, Effect>
   starter: Mark
   scores: { X: number; O: number; draws: number }
   rematch: Set<Mark>
@@ -121,6 +136,17 @@ const snapshot = (room: Room) => ({
   away: (["X", "O"] as Mark[]).find((m) => room.seats[m] && room.seats[m]!.socketId === null) ?? null,
   rematch: [...room.rematch],
 })
+
+/** Stores a new game state, tallies the score if it ended, and tells the room. */
+function commitGame(room: Room, next: GameState) {
+  room.game = next
+  if (next.winner) room.scores[next.winner]++
+  else if (next.draw) room.scores.draws++
+  if (isFinished(next)) {
+    log("game_over", { code: room.code, winner: next.winner, draw: next.draw, moves: next.moves, scores: room.scores })
+  }
+  broadcast(room)
+}
 
 const broadcast = (room: Room) => {
   room.lastActive = Date.now()
@@ -265,6 +291,7 @@ io.on("connection", (socket) => {
         code: makeCode(),
         seats: { X: { token: hostToken, socketId: null }, O: { token, socketId: null } },
         game: newGame("X"),
+        hidden: {},
         starter: "X",
         scores: { X: 0, O: 0, draws: 0 },
         rematch: new Set(),
@@ -303,6 +330,7 @@ io.on("connection", (socket) => {
       code: makeCode(),
       seats: { X: { token, socketId: null } },
       game: newGame("X", variant),
+      hidden: variant === "sabotage" ? generateHidden(boardConfig(variant).size) : {},
       starter: "X",
       scores: { X: 0, O: 0, draws: 0 },
       rematch: new Set(),
@@ -339,16 +367,28 @@ io.on("connection", (socket) => {
       return void log("move_ignored", { code: room.code, player, index, mark, full: snap.full, away: snap.away, turn: room.game.turn })
     }
 
-    const next = applyMove(room.game, index as number)
+    const next =
+      room.game.variant === "sabotage"
+        ? applySabotageMove(room.game, room.hidden, index as number)
+        : applyMove(room.game, index as number)
     if (!next) return void log("move_invalid", { code: room.code, player, index })
-    log("move", { code: room.code, mark, index, moves: next.moves })
-    room.game = next
-    if (next.winner) room.scores[next.winner]++
-    else if (next.draw) room.scores.draws++
-    if (isFinished(next)) {
-      log("game_over", { code: room.code, winner: next.winner, draw: next.draw, moves: next.moves, scores: room.scores })
+    log("move", { code: room.code, mark, index, moves: next.moves, effect: next.revealed[index as number] })
+    commitGame(room, next)
+  })
+
+  on("usePowerUp", (effect: unknown, target: unknown) => {
+    const room = myRoom()
+    if (!room) return
+    const mark = markOf(room, token)
+    const snap = snapshot(room)
+    if (!mark || !snap.full || snap.away || mark !== room.game.turn) {
+      return void log("powerup_ignored", { code: room.code, player, effect, mark, turn: room.game.turn })
     }
-    broadcast(room)
+    const next =
+      isPowerUp(effect) ? usePowerUp(room.game, effect, typeof target === "number" ? target : undefined) : null
+    if (!next) return void log("powerup_invalid", { code: room.code, player, effect, target })
+    log("powerup", { code: room.code, mark, effect, target })
+    commitGame(room, next)
   })
 
   on("rematch", () => {
@@ -361,6 +401,7 @@ io.on("connection", (socket) => {
       log("rematch_started", { code: room.code })
       room.starter = other(room.starter)
       room.game = newGame(room.starter, room.game.variant)
+      room.hidden = room.game.variant === "sabotage" ? generateHidden(room.game.size) : {}
       room.rematch.clear()
     }
     broadcast(room)

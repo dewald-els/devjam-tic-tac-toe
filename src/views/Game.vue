@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue"
 import Board from "../components/Board.vue"
+import PowerUps from "../components/PowerUps.vue"
 import Confetti from "../components/Confetti.vue"
 import Reactions from "../components/Reactions.vue"
 import Scoreboard from "../components/Scoreboard.vue"
@@ -143,7 +144,7 @@ async function copy(text: string, message: string) {
       Vanishing mode: only 3 marks each, your oldest fades away
     </div>
     <div v-if="state.game.variant === 'sabotage'" class="font-semibold text-ink/70 text-center">
-      Sabotage mode: get {{ state.game.winLength }} in a row on the {{ state.game.size }}x{{ state.game.size }} grid
+      Sabotage mode: get {{ state.game.winLength }} in a row. Tiles hide traps and power-ups!
     </div>
 
     <div
@@ -164,6 +165,7 @@ async function copy(text: string, message: string) {
     </div>
 
     <Board />
+    <PowerUps v-if="state.game.variant === 'sabotage'" />
     <Scoreboard />
 
     <Reactions v-if="state.mode === 'online' && state.opponentPresent" />

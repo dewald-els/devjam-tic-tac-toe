@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue"
 import { useGame } from "../store"
-import { MAX_MARKS } from "../utils/game"
+import { EFFECTS, MAX_MARKS } from "../utils/game"
 import Mark from "./Mark.vue"
 
 const { state, actions } = useGame()
@@ -24,10 +24,18 @@ const fading = computed(() => {
   return mine.length >= MAX_MARKS ? mine[0] : -1
 })
 
+// Sabotage: while a Block/Remove power-up is armed, only valid target tiles can be clicked
+const validTarget = (i: number) => !!state.targeting && EFFECTS[state.targeting].canTarget(state.game, i)
+const enabled = (i: number) =>
+  state.targeting
+    ? validTarget(i)
+    : state.game.board[i] === null && !state.game.blocked.includes(i) && canPlay.value
+
 const label = (i: number) => {
-  const cell = state.game.board[i]
-  const size = state.game.size
-  return `Row ${Math.floor(i / size) + 1}, column ${(i % size) + 1}: ${cell ?? "empty"}`
+  const g = state.game
+  const cell = g.board[i]
+  const extra = g.blocked.includes(i) ? ", blocked" : g.revealed[i] ? `, ${EFFECTS[g.revealed[i]].name}` : ""
+  return `Row ${Math.floor(i / g.size) + 1}, column ${(i % g.size) + 1}: ${cell ?? "empty"}${extra}`
 }
 </script>
 
@@ -50,13 +58,23 @@ const label = (i: number) => {
         'rounded-lg border-2': state.game.size > 3,
         'rounded-2xl border-4': state.game.size <= 3,
         win: state.game.line?.includes(i),
-        hint: !cell && canPlay,
+        hint: enabled(i),
+        blocked: state.game.blocked.includes(i),
+        target: !!state.targeting && validTarget(i),
         fading: i === fading,
       }"
-      :disabled="!!cell || !canPlay"
+      :disabled="!enabled(i)"
       :aria-label="label(i)"
       @click="actions.play(i)">
       <Mark v-if="cell" :mark="cell" class="absolute inset-0 m-auto w-[72%] h-[72%]" />
+      <span
+        v-else-if="state.game.blocked.includes(i)"
+        class="absolute inset-0 flex items-center justify-center text-lg sm:text-2xl"
+        aria-hidden="true">{{ state.game.revealed[i] === "bomb" ? "💥" : "🚧" }}</span>
+      <span
+        v-if="cell && state.game.revealed[i]"
+        class="absolute top-0 right-0 text-[0.6rem] sm:text-xs leading-none drop-shadow"
+        aria-hidden="true">{{ EFFECTS[state.game.revealed[i]].icon }}</span>
     </button>
   </div>
 </template>
@@ -83,6 +101,13 @@ const label = (i: number) => {
   50% {
     opacity: 0.3;
   }
+}
+.cell.blocked {
+  background-color: #d9d6e8;
+}
+.cell.target {
+  outline: 3px dashed #ff6b5b;
+  outline-offset: -3px;
 }
 .cell.hint:active {
   transform: translateY(2px);

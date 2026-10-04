@@ -1,5 +1,15 @@
 import { describe, expect, test } from "bun:test"
-import { applyMove, cpuMove, isFinished, newGame, type GameState } from "./game"
+import {
+  applyMove,
+  applySabotageMove,
+  cpuMove,
+  generateHidden,
+  isFinished,
+  newGame,
+  usePowerUp,
+  type Effect,
+  type GameState,
+} from "./game"
 
 const play = (moves: number[], g: GameState = newGame()) =>
   moves.reduce<GameState>((acc, m) => applyMove(acc, m) ?? acc, g)
@@ -83,35 +93,90 @@ describe("vanishing variant", () => {
 })
 
 describe("sabotage variant", () => {
-  const s = (moves: number[]) => play(moves, newGame("X", "sabotage"))
+  const none = {}
+  const sab = (moves: number[], hidden: Record<number, Effect> = none, g: GameState = newGame("X", "sabotage")) =>
+    moves.reduce((game, m) => applySabotageMove(game, hidden, m)!, g)
 
-  test("starts as an empty 6x6 board needing 4 in a row", () => {
+  test("starts as an empty 6x6 board needing 5 in a row", () => {
     const g = newGame("X", "sabotage")
     expect(g.board).toHaveLength(36)
-    expect([g.size, g.winLength]).toEqual([6, 4])
+    expect([g.size, g.winLength]).toEqual([6, 5])
   })
 
-  test("4 in a row wins, 3 does not", () => {
-    // X: 0,1,2 ; O: 6,7,8
-    expect(s([0, 6, 1, 7, 2, 8]).winner).toBeNull()
-    const g = s([0, 6, 1, 7, 2, 8, 3])
+  test("5 in a row wins, 4 does not", () => {
+    expect(sab([0, 6, 1, 7, 2, 8, 3, 9]).winner).toBeNull()
+    const g = sab([0, 6, 1, 7, 2, 8, 3, 9, 4])
     expect(g.winner).toBe("X")
-    expect(g.line).toEqual([0, 1, 2, 3])
+    expect(g.line).toEqual([0, 1, 2, 3, 4])
   })
 
-  test("wins vertically and on both diagonals", () => {
-    expect(s([0, 1, 6, 2, 12, 3, 18]).winner).toBe("X")
-    expect(s([0, 1, 7, 2, 14, 3, 21]).winner).toBe("X")
-    expect(s([3, 0, 8, 1, 13, 2, 18]).winner).toBe("X")
-  })
-
-  test("a line cannot wrap around the board edge", () => {
-    expect(s([4, 6, 5, 7, 6 + 0 === 6 ? 12 : 0, 8, 13]).winner).toBeNull()
+  test("wins vertically and diagonally, never by wrapping the edge", () => {
+    expect(sab([0, 1, 6, 2, 12, 3, 18, 4, 24]).winner).toBe("X")
+    expect(sab([0, 1, 7, 2, 14, 3, 21, 4, 28]).winner).toBe("X")
+    expect(sab([2, 6, 3, 7, 4, 8, 5, 9, 6 + 6]).winner).toBeNull() // 2..5 then next row: not a line
   })
 
   test("rejects out-of-range moves", () => {
     const g = newGame("X", "sabotage")
-    expect(applyMove(g, 36)).toBeNull()
-    expect(applyMove(g, 35)).not.toBeNull()
+    expect(applySabotageMove(g, none, 36)).toBeNull()
+    expect(applySabotageMove(g, none, 35)).not.toBeNull()
+  })
+
+  test("a power-up tile goes into the claimer's hand and is revealed", () => {
+    const g = sab([5], { 5: "double" })
+    expect(g.hands.X).toEqual(["double"])
+    expect(g.revealed[5]).toBe("double")
+    expect(g.turn).toBe("O")
+  })
+
+  test("skip trap: opponent plays twice in a row", () => {
+    let g = sab([5], { 5: "skip" })
+    expect([g.turn, g.movesLeft]).toEqual(["O", 2])
+    g = sab([0], none, g)
+    expect([g.turn, g.movesLeft]).toEqual(["O", 1])
+    g = sab([1], none, g)
+    expect(g.turn).toBe("X")
+  })
+
+  test("bomb trap removes the mark and blocks the tile", () => {
+    const g = sab([5], { 5: "bomb" })
+    expect(g.board[5]).toBeNull()
+    expect(g.blocked).toEqual([5])
+    expect(applySabotageMove(g, none, 5)).toBeNull()
+  })
+
+  test("power-ups: double, block, remove, reverse", () => {
+    const hidden: Record<number, Effect> = { 0: "double", 1: "block", 2: "remove", 3: "reverse" }
+    let g = sab([0, 20, 1, 21, 2, 22, 3, 23], hidden) // X holds all four; O has marks at 20..23
+    expect(g.hands.X).toEqual(["double", "block", "remove", "reverse"])
+    expect(g.turn).toBe("X")
+    // not allowed on the other player's turn
+    expect(usePowerUp({ ...g, turn: "O" }, "block", 30)).toBeNull()
+
+    const blocked = usePowerUp(g, "block", 30)!
+    expect(blocked.blocked).toEqual([30])
+    expect(blocked.powerUsed).toBe(true)
+    expect(usePowerUp(blocked, "remove", 20)).toBeNull() // one power-up per turn
+    expect(applySabotageMove(blocked, none, 30)).toBeNull()
+    expect(usePowerUp(g, "block", 0)).toBeNull() // occupied tile
+
+    const removed = usePowerUp(g, "remove", 20)!
+    expect(removed.board[20]).toBeNull()
+    expect(usePowerUp(g, "remove", 0)).toBeNull() // own mark
+
+    const reversed = usePowerUp(g, "reverse")!
+    expect(reversed.board[0]).toBe("O")
+    expect(reversed.board[20]).toBe("X")
+
+    const doubled = usePowerUp(g, "double")!
+    expect(doubled.movesLeft).toBe(2)
+    const after = applySabotageMove(doubled, none, 10)!
+    expect(after.turn).toBe("X")
+    expect(applySabotageMove(after, none, 11)!.turn).toBe("O")
+  })
+
+  test("generateHidden hides roughly 18% of tiles", () => {
+    const hidden = generateHidden(6)
+    expect(Object.keys(hidden)).toHaveLength(6)
   })
 })

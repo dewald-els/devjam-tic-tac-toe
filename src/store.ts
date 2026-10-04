@@ -1,6 +1,6 @@
 import { reactive, readonly } from "vue"
 import router from "./router"
-import { applyMove, cpuMove, GameState, isFinished, Mark, newGame, other, Variant } from "./utils/game"
+import { applyMove, cpuMove, EFFECTS, GameState, isFinished, Mark, newGame, other, Effect, Variant } from "./utils/game"
 import { play as sfx } from "./utils/sound"
 import socket, { RoomSnapshot } from "./utils/socket"
 
@@ -35,6 +35,8 @@ interface State {
   starter: Mark
   toasts: Toast[]
   reactions: FloatingReaction[]
+  /** Sabotage: a power-up waiting for the player to pick a tile. */
+  targeting: Effect | null
 }
 
 const state = reactive<State>({
@@ -54,6 +56,7 @@ const state = reactive<State>({
   starter: "X",
   toasts: [],
   reactions: [],
+  targeting: null,
 })
 
 let uid = 0
@@ -77,6 +80,15 @@ function reaction(emoji: string, from: Mark | null) {
 /** Sound feedback when the game changes, from this player's point of view. */
 function announce(prev: GameState, next: GameState) {
   if (next.moves > prev.moves) sfx("place")
+  // Sabotage: tell both players what the claimed tile hid (only for a single live move, not a resync)
+  if (next.variant === "sabotage" && next.moves === prev.moves + 1) {
+    const found = Object.keys(next.revealed).find((k) => !(Number(k) in prev.revealed))
+    if (found !== undefined) {
+      const e = EFFECTS[next.revealed[Number(found)]]
+      const who = state.you === null ? prev.turn : prev.turn === state.you ? "You" : "Your opponent"
+      toast(`${who} found ${e.icon} ${e.name}. ${e.desc}`)
+    }
+  }
   if (!isFinished(prev) && isFinished(next)) {
     if (next.draw) setTimeout(() => sfx("draw"), 200)
     else if (state.you === null || next.winner === state.you) setTimeout(() => sfx("win"), 200)
@@ -116,10 +128,12 @@ function reset() {
   state.rematchDeclined = false
   state.starter = "X"
   state.reactions = []
+  state.targeting = null
 }
 
 function applyRoom(room: RoomSnapshot) {
   announce(state.game, room.game)
+  if (room.game.turn !== state.you) state.targeting = null
   state.code = room.code
   state.game = room.game
   state.scores = room.scores
@@ -232,6 +246,25 @@ function ensureConnected(): boolean {
   return false
 }
 
+let pendingJoin: ReturnType<typeof setTimeout> | undefined
+
+/** Runs `fn` once connected. Used for invite links, which join before the socket has finished connecting. */
+function whenConnected(fn: () => void) {
+  if (socket.connected) return fn()
+  clearTimeout(pendingJoin)
+  socket.connect()
+  const run = () => {
+    clearTimeout(pendingJoin)
+    fn()
+  }
+  socket.once("connect", run)
+  // give up (and don't fire later) if the server can't be reached
+  pendingJoin = setTimeout(() => {
+    socket.off("connect", run)
+    toast("Couldn't reach the server. Check your connection and try again.", "error")
+  }, 8000)
+}
+
 // --- actions ---
 export const actions = {
   startLocal(variant: Variant = "classic") {
@@ -274,7 +307,24 @@ export const actions = {
     socket.emit("joinRoom", clean)
   },
 
+  /** Sabotage: use a power-up. Block and Remove first need the player to pick a tile. */
+  usePowerUp(effect: Effect) {
+    if (state.mode !== "online" || state.you !== state.game.turn || state.game.powerUsed) return
+    if (EFFECTS[effect].needsTarget) {
+      state.targeting = state.targeting === effect ? null : effect
+      return
+    }
+    state.targeting = null
+    socket.emit("usePowerUp", effect)
+  },
+
   play(index: number) {
+    if (state.targeting) {
+      if (state.you !== state.game.turn) return
+      socket.emit("usePowerUp", state.targeting, index)
+      state.targeting = null
+      return
+    }
     if (state.mode === "local" || (state.mode === "cpu" && state.game.turn === state.you)) {
       commit(index)
     } else if (state.mode === "online") {

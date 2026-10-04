@@ -237,3 +237,32 @@ test("sabotage rooms use a 6x6 board and keep the variant on rematch", async () 
   b.emit("move", 0)
   expect((await next(a, "roomState")).game.board[0]).toBe("O")
 })
+
+test("sabotage never leaks hidden tiles; revealing and power-ups go through the server", async () => {
+  const a = await client(), b = await client()
+  a.emit("createRoom", "sabotage")
+  const created = await next(a, "roomState")
+  b.emit("joinRoom", created.code); await next(b, "joined"); await next(a, "roomState")
+
+  expect(JSON.stringify(created)).not.toContain("hidden")
+  expect(created.game.revealed).toEqual({})
+
+  // play until someone claims a hidden tile (about 6 of 36 tiles hide something)
+  let state = created
+  let mover = a, other = b
+  state = { ...state, game: { ...state.game } }
+  for (let i = 0; i < 36 && Object.keys(state.game.revealed).length === 0; i++) {
+    mover.emit("move", i)
+    state = await next(a, "roomState")
+    ;[mover, other] = state.game.turn === "X" ? [a, b] : [b, a]
+  }
+  expect(Object.keys(state.game.revealed).length).toBeGreaterThan(0)
+
+  // a bogus power-up is ignored
+  other.emit("usePowerUp", "bogus")
+  mover.emit("usePowerUp", "bogus", 1)
+  const probe = next(a, "roomState")
+  mover.emit("move", 35)
+  const after = await probe
+  expect(after.game.board[35]).not.toBeNull()
+})
