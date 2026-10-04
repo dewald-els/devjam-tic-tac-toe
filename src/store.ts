@@ -1,6 +1,6 @@
 import { reactive, readonly } from "vue"
 import router from "./router"
-import { applyMove, cpuMove, GameState, isFinished, Mark, newGame, other } from "./utils/game"
+import { applyMove, cpuMove, GameState, isFinished, Mark, newGame, other, Variant } from "./utils/game"
 import { play as sfx } from "./utils/sound"
 import socket, { RoomSnapshot } from "./utils/socket"
 
@@ -226,15 +226,17 @@ function ensureConnected(): boolean {
 
 // --- actions ---
 export const actions = {
-  startLocal() {
+  startLocal(variant: Variant = "classic") {
     reset()
+    state.game = newGame("X", variant)
     state.mode = "local"
     state.opponentPresent = true
     router.push("/play")
   },
 
-  startCpu(level: CpuLevel) {
+  startCpu(level: CpuLevel, variant: Variant = "classic") {
     reset()
+    state.game = newGame("X", variant)
     state.mode = "cpu"
     state.you = "X"
     state.cpuLevel = level
@@ -252,9 +254,9 @@ export const actions = {
     socket.emit("cancelQueue")
   },
 
-  createRoom() {
+  createRoom(variant: Variant = "classic") {
     if (!ensureConnected()) return
-    socket.emit("createRoom")
+    socket.emit("createRoom", variant)
   },
 
   joinRoom(code: string) {
@@ -282,7 +284,7 @@ export const actions = {
     if (state.mode === "online") return void socket.emit("rematch")
     if (!isFinished(state.game)) return
     state.starter = other(state.starter)
-    state.game = newGame(state.starter)
+    state.game = newGame(state.starter, state.game.variant)
     maybeCpuTurn()
   },
 

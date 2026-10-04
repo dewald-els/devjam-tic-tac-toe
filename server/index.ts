@@ -289,7 +289,8 @@ io.on("connection", (socket) => {
     if (waiting?.id === socket.id) waiting = null
   })
 
-  on("createRoom", () => {
+  on("createRoom", (raw: unknown) => {
+    const variant = raw === "vanishing" ? "vanishing" : "classic"
     if (myRoom()) return reject("You're already in a game.", "already_in_game", { action: "createRoom" })
     if (rooms.size >= MAX_ROOMS) {
       return reject("All rooms are busy right now. Try again in a minute!", "rooms_full", { action: "createRoom" })
@@ -301,7 +302,7 @@ io.on("connection", (socket) => {
     const room: Room = {
       code: makeCode(),
       seats: { X: { token, socketId: null } },
-      game: newGame("X"),
+      game: newGame("X", variant),
       starter: "X",
       scores: { X: 0, O: 0, draws: 0 },
       rematch: new Set(),
@@ -359,7 +360,7 @@ io.on("connection", (socket) => {
     if (room.rematch.size === 2) {
       log("rematch_started", { code: room.code })
       room.starter = other(room.starter)
-      room.game = newGame(room.starter)
+      room.game = newGame(room.starter, room.game.variant)
       room.rematch.clear()
     }
     broadcast(room)

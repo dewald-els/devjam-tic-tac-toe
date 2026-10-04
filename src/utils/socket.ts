@@ -1,5 +1,5 @@
 import { io, Socket } from "socket.io-client"
-import type { GameState, Mark } from "./game"
+import type { GameState, Mark, Variant } from "./game"
 
 export interface RoomSnapshot {
   code: string
@@ -22,7 +22,7 @@ interface ServerToClientEvents {
 }
 
 interface ClientToServerEvents {
-  createRoom: () => void
+  createRoom: (variant?: Variant) => void
   quickMatch: () => void
   cancelQueue: () => void
   joinRoom: (code: string) => void

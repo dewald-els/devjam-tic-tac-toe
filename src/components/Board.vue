@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue"
 import { useGame } from "../store"
+import { MAX_MARKS } from "../utils/game"
 import Mark from "./Mark.vue"
 
 const { state, actions } = useGame()
@@ -14,6 +15,14 @@ const canPlay = computed(
     (state.mode !== "online" || state.connected) &&
     (state.mode === "local" || state.you === state.game.turn)
 )
+
+// Vanishing games: the mover's oldest mark is about to disappear, so warn them.
+const fading = computed(() => {
+  const g = state.game
+  if (g.variant !== "vanishing" || finished.value) return -1
+  const mine = g.history.filter((i) => g.board[i] === g.turn)
+  return mine.length >= MAX_MARKS ? mine[0] : -1
+})
 
 const label = (i: number) => {
   const cell = state.game.board[i]
@@ -30,6 +39,7 @@ const label = (i: number) => {
       :class="{
         win: state.game.line?.includes(i),
         hint: !cell && canPlay,
+        fading: i === fading,
       }"
       :disabled="!!cell || !canPlay"
       :aria-label="label(i)"
@@ -52,6 +62,14 @@ const label = (i: number) => {
     cursor: pointer;
     transform: translateY(-3px) rotate(-1.5deg);
     background-color: #fff4dc;
+  }
+}
+.cell.fading > * {
+  animation: fade 1.2s ease-in-out infinite;
+}
+@keyframes fade {
+  50% {
+    opacity: 0.3;
   }
 }
 .cell.hint:active {

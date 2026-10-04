@@ -139,6 +139,9 @@ async function copy(text: string, message: string) {
       You (X) vs computer · {{ state.cpuLevel === "hard" ? "unbeatable" : "easy" }}
     </div>
     <div v-else-if="state.mode === 'local'" class="font-semibold text-ink/70">Playing locally on one device</div>
+    <div v-if="state.game.variant === 'vanishing'" class="font-semibold text-ink/70 text-center">
+      Vanishing mode: only 3 marks each, your oldest fades away
+    </div>
 
     <div
       class="mt-4 mb-3 sm:my-0 flex items-stretch overflow-hidden rounded-full border-4 border-ink font-bold text-lg sm:text-xl shadow-pop-sm"

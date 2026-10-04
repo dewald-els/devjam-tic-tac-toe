@@ -57,3 +57,27 @@ describe("game engine", () => {
     expect(cpuMove(play([0, 4, 1]), "hard")).toBe(7 - 5) // O must block at 2
   })
 })
+
+describe("vanishing variant", () => {
+  const v = (moves: number[]) => play(moves, newGame("X", "vanishing"))
+
+  test("a 4th mark removes that player's oldest", () => {
+    const g = v([0, 3, 1, 4, 8, 7, 6]) // X: 0,1,8,6 -> 0 vanishes
+    expect(g.board[0]).toBeNull()
+    expect(g.board.filter((c) => c === "X").length).toBe(3)
+    expect(g.board.filter((c) => c === "O").length).toBe(3)
+  })
+
+  test("never ends in a draw", () => {
+    const g = v([0, 1, 2, 4, 3, 5, 7, 6, 8])
+    expect(g.draw).toBe(false)
+  })
+
+  test("a vanished cell can be replayed", () => {
+    expect(applyMove(v([0, 3, 1, 4, 8, 7, 6]), 0)).not.toBeNull()
+  })
+
+  test("CPU takes a win in vanishing mode", () => {
+    expect(cpuMove(v([0, 3, 1, 4]), "hard")).toBe(2)
+  })
+})

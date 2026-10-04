@@ -1,7 +1,15 @@
 export type Mark = "X" | "O"
 export type Cell = Mark | null
 
+export type Variant = "classic" | "vanishing"
+
+/** In "vanishing" games a player keeps at most this many marks; placing another removes their oldest. */
+export const MAX_MARKS = 3
+
 export interface GameState {
+  variant: Variant
+  /** Board indices in placement order (vanishing only; oldest first). */
+  history: number[]
   board: Cell[]
   turn: Mark
   winner: Mark | null
@@ -18,8 +26,10 @@ export const LINES = [
 
 export const other = (mark: Mark): Mark => (mark === "X" ? "O" : "X")
 
-export function newGame(starter: Mark = "X"): GameState {
+export function newGame(starter: Mark = "X", variant: Variant = "classic"): GameState {
   return {
+    variant,
+    history: [],
     board: Array<Cell>(9).fill(null),
     turn: starter,
     winner: null,
@@ -51,15 +61,27 @@ export function applyMove(game: GameState, index: number): GameState | null {
   const board = game.board.slice()
   board[index] = game.turn
   const moves = game.moves + 1
+  const vanishing = game.variant === "vanishing"
+  let history = game.history
+  if (vanishing) {
+    history = [...history, index]
+    const mine = history.filter((i) => board[i] === game.turn)
+    if (mine.length > MAX_MARKS) {
+      board[mine[0]] = null
+      history = history.filter((i) => i !== mine[0])
+    }
+  }
   const result = findWinner(board)
 
   return {
+    variant: game.variant,
+    history,
     board,
     moves,
     turn: other(game.turn),
     winner: result?.winner ?? null,
     line: result?.line ?? null,
-    draw: !result && moves === 9,
+    draw: !vanishing && !result && moves === 9,
   }
 }
 
@@ -79,6 +101,16 @@ export function cpuMove(game: GameState, level: "easy" | "hard"): number {
   if (level === "easy") return options[Math.floor(Math.random() * options.length)]
 
   const me = game.turn
+  // Vanishing games never end by filling the board, so full search doesn't terminate: win, block, else centre/random.
+  if (game.variant === "vanishing") {
+    const wins = (m: Mark, i: number) => applyMove({ ...game, turn: m }, i)?.winner === m
+    return (
+      options.find((i) => wins(me, i)) ??
+      options.find((i) => wins(other(me), i)) ??
+      (options.includes(4) ? 4 : options[Math.floor(Math.random() * options.length)])
+    )
+  }
+
   let best = -Infinity
   let picks: number[] = []
   for (const i of options) {
