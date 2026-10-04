@@ -5,12 +5,12 @@ const { state } = useGame()
 </script>
 
 <template>
-  <div class="fixed bottom-4 inset-x-4 flex flex-col items-center gap-2 pointer-events-none" aria-live="polite">
+  <div class="fixed bottom-4 inset-x-4 short:bottom-2 short:inset-x-3 flex flex-col items-center gap-2 short:gap-1 pointer-events-none" aria-live="polite">
     <TransitionGroup name="toast">
       <div
         v-for="t in state.toasts"
         :key="t.id"
-        class="border-4 border-ink rounded-2xl px-4 py-2 font-bold shadow-pop-sm max-w-sm text-center"
+        class="border-4 border-ink rounded-2xl px-4 py-2 font-bold shadow-pop-sm max-w-sm text-center short:border-2 short:rounded-xl short:px-3 short:py-1 short:text-sm short:leading-tight"
         :class="t.kind === 'error' ? 'bg-coral text-white' : 'bg-white'">
         {{ t.text }}
       </div>

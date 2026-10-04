@@ -31,6 +31,8 @@ export interface EffectDef {
   kind: "trap" | "powerup"
   /** Relative chance of being hidden under a tile. */
   weight: number
+  /** Power-ups only: playing it uses up the player's turn. Set false for effects that add to the turn instead. */
+  endsTurn: boolean
   /** Power-ups only: the player must pick a tile before it can be played. */
   needsTarget: boolean
   /** Whether `index` is a legal target. Used to validate on the server and highlight tiles in the UI. */
@@ -45,6 +47,7 @@ type EffectSpec = Partial<EffectDef> & Pick<EffectDef, "name" | "icon" | "desc">
 
 const base: Omit<EffectDef, "name" | "icon" | "desc" | "kind"> = {
   weight: 1,
+  endsTurn: false,
   needsTarget: false,
   canTarget: () => false,
   onClaim: () => {},
@@ -58,6 +61,7 @@ const trap = (spec: EffectSpec): EffectDef => ({ ...base, kind: "trap", ...spec 
 const powerUp = (spec: EffectSpec): EffectDef => ({
   ...base,
   kind: "powerup",
+  endsTurn: true,
   onClaim: (draft, id) => void draft.hands[draft.turn].push(id),
   ...spec,
 })
@@ -95,8 +99,9 @@ export const EFFECTS = registry({
   double: powerUp({
     name: "Double",
     icon: "✌️",
-    desc: "Play two tiles this turn.",
+    desc: "Play two tiles this turn. Doesn't use up your turn.",
     weight: 2,
+    endsTurn: false,
     use: (d) => void (d.movesLeft += 1),
   }),
 

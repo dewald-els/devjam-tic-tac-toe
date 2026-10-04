@@ -256,7 +256,10 @@ export function applySabotageMove(game: GameState, hidden: Record<number, Effect
   }
 }
 
-/** Plays a power-up from the current player's hand (a free action; one per turn). Returns null when illegal. */
+/**
+ * Plays a power-up from the current player's hand. Most end the turn (`endsTurn`); the rest are free,
+ * one per turn. Returns null when illegal.
+ */
 export function usePowerUp(game: GameState, effect: Effect, target?: number): GameState | null {
   if (game.variant !== "sabotage" || isFinished(game) || game.powerUsed || !isPowerUp(effect)) return null
   const me = game.turn
@@ -273,5 +276,10 @@ export function usePowerUp(game: GameState, effect: Effect, target?: number): Ga
   d.hands[me].splice(at, 1)
   def.use(d, target)
 
-  return { ...game, ...outcome(game, d), movesLeft: d.movesLeft, powerUsed: true }
+  const out = outcome(game, d)
+  if (def.endsTurn && out.winner === null && !out.draw) {
+    // Playing a power-up uses up the turn
+    return { ...game, ...out, turn: other(me), movesLeft: 1, powerUsed: false }
+  }
+  return { ...game, ...out, movesLeft: d.movesLeft, powerUsed: true }
 }

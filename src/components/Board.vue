@@ -44,8 +44,8 @@ const label = (i: number) => {
     class="grid"
     :class="
       state.game.size > 3
-        ? 'gap-1 sm:gap-2 w-[min(92vw,28rem,50dvh)] h-[min(92vw,28rem,50dvh)]'
-        : 'gap-2 sm:gap-4 w-[min(88vw,22rem,46dvh)] h-[min(88vw,22rem,46dvh)]'
+        ? 'gap-1 sm:gap-2 w-[min(92vw,28rem,50dvh)] h-[min(92vw,28rem,50dvh)] short:w-[min(92vw,28rem,44dvh)] short:h-[min(92vw,28rem,44dvh)]'
+        : 'gap-2 sm:gap-4 w-[min(88vw,22rem,46dvh)] h-[min(88vw,22rem,46dvh)] short:w-[min(88vw,22rem,41dvh)] short:h-[min(88vw,22rem,41dvh)]'
     "
     :style="{ gridTemplateColumns: `repeat(${state.game.size}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${state.game.size}, minmax(0, 1fr))` }"
     role="group"
@@ -66,14 +66,20 @@ const label = (i: number) => {
       :disabled="!enabled(i)"
       :aria-label="label(i)"
       @click="actions.play(i)">
-      <Mark v-if="cell" :mark="cell" class="absolute inset-0 m-auto w-[72%] h-[72%]" />
+      <Mark
+        v-if="cell"
+        :mark="cell"
+        class="absolute"
+        :class="state.game.revealed[i] ? 'left-[5%] bottom-[5%] w-[66%] h-[66%]' : 'inset-0 m-auto w-[72%] h-[72%]'" />
       <span
         v-else-if="state.game.blocked.includes(i)"
         class="absolute inset-0 flex items-center justify-center text-lg sm:text-2xl"
         aria-hidden="true">{{ state.game.revealed[i] === "bomb" ? "💥" : "🚧" }}</span>
+      <!-- Effect found under this tile: round badge in the top-right corner -->
       <span
         v-if="cell && state.game.revealed[i]"
-        class="absolute top-0 right-0 text-[0.6rem] sm:text-xs leading-none drop-shadow"
+        class="badge absolute top-[5%] right-[5%] flex items-center justify-center rounded-full border-ink bg-white"
+        :class="state.game.size > 3 ? 'border-2' : 'border-4'"
         aria-hidden="true">{{ EFFECTS[state.game.revealed[i]].icon }}</span>
     </button>
   </div>
@@ -81,7 +87,15 @@ const label = (i: number) => {
 
 <style scoped>
 .cell {
+  container-type: size;
   transition: transform 0.12s, background-color 0.2s;
+}
+/* Sized from the tile itself (cqw = 1% of its width), so it scales with the board */
+.badge {
+  width: 42cqw;
+  height: 42cqw;
+  font-size: 26cqw;
+  line-height: 1;
 }
 .cell:disabled {
   cursor: default;

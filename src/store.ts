@@ -246,7 +246,7 @@ function ensureConnected(): boolean {
   return false
 }
 
-let pendingJoin: ReturnType<typeof setTimeout> | undefined
+let pendingJoin: any
 
 /** Runs `fn` once connected. Used for invite links, which join before the socket has finished connecting. */
 function whenConnected(fn: () => void) {
@@ -303,8 +303,7 @@ export const actions = {
   joinRoom(code: string) {
     const clean = code.trim().toUpperCase()
     if (!clean) return toast("Enter a room code first.", "error")
-    if (!ensureConnected()) return
-    socket.emit("joinRoom", clean)
+    whenConnected(() => socket.emit("joinRoom", clean))
   },
 
   /** Sabotage: use a power-up. Block and Remove first need the player to pick a tile. */

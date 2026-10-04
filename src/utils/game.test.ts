@@ -155,8 +155,9 @@ describe("sabotage variant", () => {
 
     const blocked = usePowerUp(g, "block", 30)!
     expect(blocked.blocked).toEqual([30])
-    expect(blocked.powerUsed).toBe(true)
-    expect(usePowerUp(blocked, "remove", 20)).toBeNull() // one power-up per turn
+    expect(blocked.turn).toBe("O") // playing a power-up uses up the turn
+    expect(blocked.hands.X).not.toContain("block")
+    expect(usePowerUp(blocked, "remove", 0)).toBeNull() // O holds no power-ups
     expect(applySabotageMove(blocked, none, 30)).toBeNull()
     expect(usePowerUp(g, "block", 0)).toBeNull() // occupied tile
 
@@ -169,7 +170,9 @@ describe("sabotage variant", () => {
     expect(reversed.board[20]).toBe("X")
 
     const doubled = usePowerUp(g, "double")!
+    expect(doubled.turn).toBe("X") // Double is free: it doesn't use up the turn
     expect(doubled.movesLeft).toBe(2)
+    expect(usePowerUp(doubled, "block", 30)).toBeNull() // free power-ups: still one per turn
     const after = applySabotageMove(doubled, none, 10)!
     expect(after.turn).toBe("X")
     expect(applySabotageMove(after, none, 11)!.turn).toBe("O")

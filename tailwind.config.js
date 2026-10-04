@@ -3,6 +3,10 @@ module.exports = {
   content: ["./index.html", "./src/**/*.{js,ts,vue}"],
   theme: {
     extend: {
+      screens: {
+        // Short phones (iPhone SE is 667px tall): tighten the game screen so it fits without scrolling
+        short: { raw: "(max-height: 700px)" },
+      },
       colors: {
         cream: "#FFF4DC",
         ink: "#2D2A4A",
